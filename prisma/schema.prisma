@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Direction {
+  UP
+  DOWN
+  LEFT
+  RIGHT
+}
+
+enum SessionStatus {
+  ONLINE
+  OFFLINE
+}
+
+model DeveloperSession {
+  id            String         @id @default(uuid())
+  displayName   String
+  avatarColor   String         @default("#2563eb")
+  roomId        String
+  positionX     Int            @default(0)
+  positionY     Int            @default(0)
+  direction     Direction      @default(DOWN)
+  status        SessionStatus  @default(ONLINE)
+  lastSeenAt    DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  room          Room           @relation(fields: [roomId], references: [id])
+  sentMessages  ChatMessage[]  @relation("MessageSender")
+  conversationsA Conversation[] @relation("ConversationParticipantA")
+  conversationsB Conversation[] @relation("ConversationParticipantB")
+
+  @@index([roomId, status])
+  @@index([roomId, positionX, positionY])
+}
+
+model Room {
+  id            String             @id @default(uuid())
+  name          String
+  inviteCode    String             @unique
+  width         Int                @default(20)
+  height        Int                @default(12)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  sessions      DeveloperSession[]
+  conversations Conversation[]
+
+  @@index([inviteCode])
+}
+
+model Conversation {
+  id             String            @id @default(uuid())
+  roomId         String
+  participantAId String
+  participantBId String
+  room           Room              @relation(fields: [roomId], references: [id])
+  participantA   DeveloperSession  @relation("ConversationParticipantA", fields: [participantAId], references: [id])
+  participantB   DeveloperSession  @relation("ConversationParticipantB", fields: [participantBId], references: [id])
+  messages       ChatMessage[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([roomId, participantAId, participantBId])
+  @@index([participantAId])
+  @@index([participantBId])
+}
+
+model ChatMessage {
+  id             String            @id @default(uuid())
+  conversationId String
+  senderId       String
+  body           String            @db.VarChar(1000)
+  conversation   Conversation      @relation(fields: [conversationId], references: [id])
+  sender         DeveloperSession  @relation("MessageSender", fields: [senderId], references: [id])
+  createdAt      DateTime          @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
