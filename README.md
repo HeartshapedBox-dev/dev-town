@@ -13,16 +13,55 @@ NestJS 기반 개발자 타운 채팅 웹 백엔드입니다.
 
 ## Getting Started
 
-PostgreSQL 연결 문자열을 준비한 뒤 `.env.example`을 참고해 `DATABASE_URL`을 설정합니다.
+로컬 개발은 PostgreSQL만 Docker로 띄우고, 백엔드/프론트는 호스트에서 실행하는 구성을 권장합니다.
 
 ```bash
-export DATABASE_URL="postgresql://user:password@localhost:5432/dev_town?schema=public"
-pnpm prisma:generate
+pnpm db:up
+```
+
+`.env.example`을 복사해 `.env`를 만들고 `DATABASE_URL`을 확인합니다.
+
+```bash
+cp .env.example .env
 pnpm prisma:migrate:dev --name init
+pnpm prisma:generate
 pnpm dev
 ```
 
+Prisma 실행 순서는 다음과 같습니다.
+
+1. `pnpm db:up`
+2. `cp .env.example .env`
+3. `pnpm prisma:migrate:dev --name init`
+4. 필요 시 `pnpm prisma:generate`
+5. `pnpm dev`
+6. 별도 터미널에서 `pnpm dev:web`
+
+`pnpm prisma:migrate:dev`는 개발용 마이그레이션과 Prisma Client 생성을 함께 처리하므로, 초기 세팅에서는 이 명령이 핵심입니다. 클라이언트만 다시 만들고 싶을 때는 `pnpm prisma:generate`를 사용합니다.
+
+스키마를 이후에 바꿀 때는 `pnpm prisma:migrate:dev --name <migration-name>`을 다시 실행하면 됩니다.
+
+DB 컨테이너를 내리거나 로그를 확인할 때는 다음 명령을 사용합니다.
+
+```bash
+pnpm db:down
+pnpm db:logs
+```
+
 HTTP 서버는 기본 `3000` 포트를 사용하며 `PORT`로 변경할 수 있습니다.
+
+## Frontend
+
+프론트엔드는 `apps/web`에 분리되어 있으며 기본 실행 포트는 `3001`입니다.
+
+```bash
+pnpm dev:web
+```
+
+필요하면 프론트엔드에서 다음 환경변수를 사용할 수 있습니다.
+
+- `NEXT_PUBLIC_API_BASE_URL`: 백엔드 REST 기본 URL
+- `NEXT_PUBLIC_SOCKET_URL`: Socket.IO 연결 URL
 
 ## Verification
 

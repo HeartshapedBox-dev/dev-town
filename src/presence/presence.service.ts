@@ -33,7 +33,13 @@ export class PresenceService {
   }
 
   updatePosition(sessionId: string, dto: UpdatePositionDto) {
-    return this.presenceRepository.updatePosition(sessionId, dto);
+    const { roomId, positionX, positionY, direction } = dto;
+    return this.presenceRepository.updatePosition(sessionId, {
+      roomId,
+      positionX,
+      positionY,
+      direction,
+    });
   }
 
   async getSessionOrThrow(sessionId: string) {

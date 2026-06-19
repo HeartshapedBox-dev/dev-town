@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: dev-town-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: dev_town
+      POSTGRES_USER: dev_town
+      POSTGRES_PASSWORD: dev_town
+    volumes:
+      - dev-town-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev_town -d dev_town"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  dev-town-postgres-data:

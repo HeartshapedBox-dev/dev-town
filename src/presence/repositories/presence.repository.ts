@@ -28,11 +28,15 @@ export class PresenceRepository {
     positionY: number;
     direction: Direction;
   }) {
+    const { roomId, positionX, positionY, direction } = data;
     try {
       return await this.prisma.developerSession.update({
         where: { id },
         data: {
-          ...data,
+          roomId,
+          positionX,
+          positionY,
+          direction,
           status: "ONLINE",
           lastSeenAt: new Date(),
         },

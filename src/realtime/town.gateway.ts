@@ -18,6 +18,7 @@ import { JoinConversationDto } from "./dto/join-conversation.dto";
 import { JoinRoomDto } from "./dto/join-room.dto";
 import { MoveCharacterDto } from "./dto/move-character.dto";
 import { SendRealtimeMessageDto } from "./dto/send-realtime-message.dto";
+import { UpdatePositionDto } from "../presence/dto/update-position.dto";
 
 type ConversationState = {
   id: string;
@@ -28,7 +29,13 @@ type ConversationState = {
 
 // 캐릭터 이동과 채팅 상태를 Socket.IO room 단위로 전달한다.
 // 여기서는 "마주보면 열림, 조건이 깨지면 닫힘" 상태 전이를 실시간으로 계산한다.
-@WebSocketGateway({ namespace: "town", cors: true })
+@WebSocketGateway({
+  namespace: "town",
+  cors: {
+    origin: true,
+    credentials: true,
+  },
+})
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
 export class TownGateway implements OnGatewayDisconnect {
   @WebSocketServer()
@@ -89,7 +96,11 @@ export class TownGateway implements OnGatewayDisconnect {
     @MessageBody() payload: MoveCharacterDto,
   ) {
     // 이동 요청이 들어오면 좌표 갱신 후, 마주보기 조건 변화에 따른 채팅 상태를 다시 계산한다.
-    const session = await this.presenceService.updatePosition(payload.sessionId, payload);
+    const { sessionId, ...position } = payload;
+    const session = await this.presenceService.updatePosition(
+      sessionId,
+      position as UpdatePositionDto,
+    );
     this.registerSessionSocket(session.id, client);
     await client.join(session.roomId);
     this.server.to(session.roomId).emit("characterMoved", session);
