@@ -3,7 +3,7 @@ import { PresenceController } from "./presence.controller";
 import { PresenceService } from "./presence.service";
 import { PresenceRepository } from "./repositories/presence.repository";
 
-// 캐릭터 이동과 방 접속자 기능을 하나의 모듈로 묶는다.
+// 캐릭터 세션 생성, 위치 갱신, 방 내 온라인 목록 조회를 담당하는 모듈이다.
 @Module({
   controllers: [PresenceController],
   providers: [PresenceService, PresenceRepository],

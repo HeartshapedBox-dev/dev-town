@@ -9,6 +9,9 @@
     "build": "nest build",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev"
   },
@@ -30,11 +33,14 @@
     "@eslint/js": "^9.39.4",
     "@nestjs/cli": "^11.0.23",
     "@nestjs/testing": "^11.1.27",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/supertest": "^7.2.0",
     "eslint": "^9",
+    "jest": "^30.4.2",
     "prisma": "6",
     "supertest": "^7.2.2",
+    "ts-jest": "^29.4.11",
     "typescript": "^5",
     "typescript-eslint": "^8.61.1"
   }

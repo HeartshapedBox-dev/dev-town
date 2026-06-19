@@ -4,7 +4,7 @@ import { ChatController } from "./chat.controller";
 import { ChatService } from "./chat.service";
 import { ChatRepository } from "./repositories/chat.repository";
 
-// 대화방과 메시지 기능 의존성을 하나의 모듈로 묶는다.
+// 대화방 생성, 메시지 저장, 채팅 검증 로직을 한 모듈에서 관리한다.
 @Module({
   imports: [PresenceModule],
   controllers: [ChatController],

@@ -5,7 +5,7 @@ import { FindOrCreateConversationDto } from "./dto/find-or-create-conversation.d
 import { SendMessageDto } from "./dto/send-message.dto";
 import { ChatRepository } from "./repositories/chat.repository";
 
-// 대화방 열기와 메시지 전송 전에 근접 조건을 검증한다.
+// 대화방 열기와 메시지 전송 전에 마주보기 조건을 검증한다.
 @Injectable()
 export class ChatService {
   constructor(
@@ -55,7 +55,7 @@ export class ChatService {
 
   private assertCanChat(requester: DeveloperSession, peer: DeveloperSession) {
     if (!this.presenceService.canStartConversation(requester, peer)) {
-      throw new ForbiddenException("Characters must be close or facing each other to chat");
+      throw new ForbiddenException("Characters must be facing each other to chat");
     }
   }
 

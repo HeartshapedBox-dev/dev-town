@@ -39,7 +39,7 @@ pnpm build
 - `POST /presence/sessions`: 캐릭터 세션 생성
 - `GET /presence/rooms/:roomId/sessions`: 방의 온라인 캐릭터 조회
 - `PATCH /presence/sessions/:sessionId/position`: 위치와 방향 갱신
-- `POST /chats/conversations`: 가까운 캐릭터 간 대화방 생성 또는 조회
+- `POST /chats/conversations`: 마주보고 있는 캐릭터 간 대화방 생성 또는 조회
 - `GET /chats/conversations/:conversationId/messages`: 최근 메시지 조회
 - `POST /chats/conversations/:conversationId/messages`: 보조/관리 목적의 메시지 전송
 
@@ -50,10 +50,12 @@ pnpm build
 - namespace: `/town`
 - `joinByInviteCode`: 초대코드로 방에 입장하고 랜덤 캐릭터 세션 생성 후 `characterJoined` broadcast
 - `joinRoom`: 사무실 방 입장 후 현재 온라인 캐릭터 목록 반환
-- `move`: 캐릭터 이동 후 `characterMoved` broadcast
-- `openConversation`: 근접/마주보기 조건 확인 후 대화방을 열고 현재 소켓을 `conversation:{conversationId}` room에 입장
+- `move`: 캐릭터 이동 후 `characterMoved` broadcast, 서로 마주본 대화는 `conversationOpened`, 조건이 깨진 대화는 `conversationClosed` 전송
+- `openConversation`: 마주보기 조건 확인 후 대화방을 열고 양쪽 소켓을 `conversation:{conversationId}` room에 입장
 - `joinConversation`: 기존 대화방의 `conversation:{conversationId}` room 입장
 - `sendMessage`: 메시지 저장 후 같은 대화방 room에 `messageCreated` broadcast
+
+대화 메시지는 DB에 유지됩니다. 캐릭터가 떨어지거나 방향이 바뀌어 마주보기 조건이 깨지면 채팅창을 닫기 위한 `conversationClosed` 이벤트만 전송하며, 이전 대화 내용은 삭제하지 않습니다.
 
 ## Project Structure
 

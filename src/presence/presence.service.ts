@@ -4,7 +4,7 @@ import { CreateSessionDto } from "./dto/create-session.dto";
 import { UpdatePositionDto } from "./dto/update-position.dto";
 import { PresenceRepository } from "./repositories/presence.repository";
 
-// 캐릭터 세션과 근접 판정 규칙을 처리한다.
+// 캐릭터 세션과 마주보기 판정 규칙을 처리한다.
 @Injectable()
 export class PresenceService {
   constructor(private readonly presenceRepository: PresenceRepository) {}
@@ -49,11 +49,7 @@ export class PresenceService {
       return false;
     }
 
-    return this.isNear(a, b) || this.isFacingEachOther(a, b);
-  }
-
-  private isNear(a: DeveloperSession, b: DeveloperSession) {
-    return Math.abs(a.positionX - b.positionX) + Math.abs(a.positionY - b.positionY) <= 1;
+    return this.isFacingEachOther(a, b);
   }
 
   private isFacingEachOther(a: DeveloperSession, b: DeveloperSession) {
