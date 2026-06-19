@@ -181,6 +181,12 @@ describe("TownGateway", () => {
       direction: "LEFT",
     } as never);
 
+    expect(presenceService.updatePosition).toHaveBeenCalledWith("session-b", {
+      roomId: room.id,
+      positionX: 5,
+      positionY: 5,
+      direction: "LEFT",
+    });
     expect(server.to).toHaveBeenCalledWith("conversation:conversation-1");
     expect(server.emit).toHaveBeenCalledWith("conversationClosed", {
       conversationId: "conversation-1",

@@ -2,16 +2,13 @@
 
 import type { DeveloperSession, Direction, Room } from "@/lib/types";
 import { CharacterAvatar } from "./character-avatar";
-import {
-  buildOfficeLayout,
-  createTileKey,
-  getFurnitureClassName,
-  getTileClassName,
-} from "./office-map";
+import type { OfficeLayout } from "./office-map";
+import { createTileKey, getFurnitureClassName, getTileClassName } from "./office-map";
 import styles from "./town-board.module.css";
 
 type TownBoardProps = {
   room: Room;
+  layout: OfficeLayout;
   session: DeveloperSession;
   sessions: DeveloperSession[];
   selectedPeerId: string | null;
@@ -25,6 +22,7 @@ const TILE_PX = 64;
 
 export function TownBoard({
   room,
+  layout,
   session,
   sessions,
   selectedPeerId,
@@ -33,8 +31,6 @@ export function TownBoard({
   connectionState,
   blockedNotice,
 }: TownBoardProps) {
-  const layout = buildOfficeLayout(room.width, room.height);
-
   return (
     <section className={styles.panel}>
       <div className={styles.frame}>
