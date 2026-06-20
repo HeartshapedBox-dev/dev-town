@@ -2,22 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  createRoom,
-  createSession,
-  joinRoomByInvite,
-} from "@/lib/api";
+import { createRoom, createSession, joinRoomByInvite } from "@/lib/api";
 import { saveTownSnapshot } from "@/lib/storage";
 import type { Room, DeveloperSession } from "@/lib/types";
-
-const DEFAULT_WIDTH = 20;
-const DEFAULT_HEIGHT = 12;
+import { OFFICE_ROOM_PRESET, ROOM_PRESETS, type RoomPresetId } from "./room-presets";
 
 export function LandingClient() {
   const router = useRouter();
   const [roomName, setRoomName] = useState("개발자 타운");
-  const [roomWidth, setRoomWidth] = useState(String(DEFAULT_WIDTH));
-  const [roomHeight, setRoomHeight] = useState(String(DEFAULT_HEIGHT));
+  const [roomPresetId, setRoomPresetId] = useState<RoomPresetId>(OFFICE_ROOM_PRESET.id);
   const [displayName, setDisplayName] = useState("Tester");
   const [inviteCode, setInviteCode] = useState("");
   const [createdRoom, setCreatedRoom] = useState<Room | null>(null);
@@ -32,8 +25,6 @@ export function LandingClient() {
     try {
       const room = await createRoom({
         name: roomName.trim() || "개발자 타운",
-        width: Number(roomWidth),
-        height: Number(roomHeight),
       });
 
       setCreatedRoom(room);
@@ -132,6 +123,23 @@ export function LandingClient() {
 
               <div className="form-grid">
                 <label className="field">
+                  <span className="field-label">방 종류</span>
+                  <div className="select-shell">
+                    <select
+                      className="input select-input"
+                      value={roomPresetId}
+                      onChange={(event) => setRoomPresetId(event.target.value as RoomPresetId)}
+                    >
+                      {ROOM_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {preset.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </label>
+
+                <label className="field">
                   <span className="field-label">방 이름</span>
                   <input
                     className="input"
@@ -141,37 +149,13 @@ export function LandingClient() {
                   />
                 </label>
 
-                <div className="grid-two">
-                  <label className="field">
-                    <span className="field-label">가로</span>
-                    <input
-                      className="input"
-                      type="number"
-                      min={4}
-                      max={200}
-                      value={roomWidth}
-                      onChange={(event) => setRoomWidth(event.target.value)}
-                    />
-                  </label>
-                  <label className="field">
-                    <span className="field-label">세로</span>
-                    <input
-                      className="input"
-                      type="number"
-                      min={4}
-                      max={200}
-                      value={roomHeight}
-                      onChange={(event) => setRoomHeight(event.target.value)}
-                    />
-                  </label>
-                </div>
-
                 {createdRoom ? (
                   <div className="muted-block">
+                    <strong>{roomPresetLabel(roomPresetId)}</strong> / 방 이름{" "}
                     <strong>{createdRoom.name}</strong> / 초대코드{" "}
                     <span className="chip chip-success">{createdRoom.inviteCode}</span>
                     <div className="footer-note">
-                      세션을 만들면 바로 메인 타운 화면으로 이동합니다.
+                      사무실 맵(12 x 11) 기준으로 세션을 만들고 바로 메인 타운 화면으로 이동합니다.
                     </div>
                   </div>
                 ) : null}
@@ -262,4 +246,8 @@ function getMessage(cause: unknown) {
   }
 
   return "요청 처리에 실패했습니다.";
+}
+
+function roomPresetLabel(roomPresetId: RoomPresetId) {
+  return ROOM_PRESETS.find((preset) => preset.id === roomPresetId)?.label ?? OFFICE_ROOM_PRESET.label;
 }

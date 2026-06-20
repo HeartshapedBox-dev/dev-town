@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { TownConversationPanel } from "./town/conversation-panel";
 import { TownBoard } from "./town/TownBoard";
+import { getVisibleCharacterPosition } from "./town/character-position";
 import { useTownScreen } from "./town/use-town-screen";
 
 type TownClientProps = {
@@ -39,6 +40,8 @@ export function TownScreen({ initialRoomId, initialSessionId }: TownClientProps)
     terminalState,
     terminalMessage,
   } = useTownScreen({ initialRoomId, initialSessionId });
+  const visibleArea = officeLayout ?? room;
+  const visibleSessionPosition = visibleArea && session ? getVisibleCharacterPosition(session, visibleArea) : null;
 
   if (terminalState && terminalMessage) {
     return (
@@ -155,7 +158,7 @@ export function TownScreen({ initialRoomId, initialSessionId }: TownClientProps)
                   </div>
 
                   <div className="mini">
-                    좌표(0-base): ({session.positionX}, {session.positionY}) · 상태: {session.status}
+                    좌표(0-base): ({visibleSessionPosition?.positionX}, {visibleSessionPosition?.positionY}) · 상태: {session.status}
                   </div>
                 </div>
               </div>
@@ -185,7 +188,14 @@ export function TownScreen({ initialRoomId, initialSessionId }: TownClientProps)
                         <span className="chip">{candidate.direction}</span>
                       </div>
                       <div className="mini">
-                        좌표(0-base): ({candidate.positionX}, {candidate.positionY}) · {candidate.status}
+                        좌표(0-base): (
+                        {visibleArea
+                          ? getVisibleCharacterPosition(candidate, visibleArea).positionX
+                          : candidate.positionX},{" "}
+                        {visibleArea
+                          ? getVisibleCharacterPosition(candidate, visibleArea).positionY
+                          : candidate.positionY}) ·{" "}
+                        {candidate.status}
                       </div>
                     </button>
                   ))}

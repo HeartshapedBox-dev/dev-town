@@ -35,8 +35,6 @@ export const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL ?? `${API_BASE_URL.r
 
 export type CreateRoomInput = {
   name?: string;
-  width?: number;
-  height?: number;
 };
 
 export type JoinRoomByInviteInput = {

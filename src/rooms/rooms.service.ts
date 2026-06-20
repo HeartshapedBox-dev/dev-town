@@ -21,8 +21,8 @@ export class RoomsService {
         return await this.roomsRepository.create({
           name: dto.name ?? "개발자 타운",
           inviteCode: this.createInviteCode(),
-          width: dto.width ?? 20,
-          height: dto.height ?? 12,
+          width: 12,
+          height: 11,
         });
       } catch (error) {
         if (this.isUniqueInviteCodeError(error)) {

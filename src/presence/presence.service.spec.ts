@@ -55,20 +55,25 @@ describe("PresenceService", () => {
   });
 
   it("blocks moving into a tile occupied by another online session", async () => {
+    presenceRepository.findRoomById.mockResolvedValue({
+      id: "room-1",
+      width: 12,
+      height: 11,
+    });
     presenceRepository.listOnlineByRoom.mockResolvedValue([
       {
         id: "session-a",
         roomId: "room-1",
-        positionX: 8,
-        positionY: 10,
+        positionX: 6,
+        positionY: 9,
         direction: "RIGHT",
         status: "ONLINE",
       },
       {
         id: "session-b",
         roomId: "room-1",
-        positionX: 9,
-        positionY: 10,
+        positionX: 7,
+        positionY: 9,
         direction: "LEFT",
         status: "ONLINE",
       },
@@ -77,51 +82,100 @@ describe("PresenceService", () => {
     await expect(
       presenceService.updatePosition("session-a", {
         roomId: "room-1",
-        positionX: 9,
-        positionY: 10,
+        positionX: 7,
+        positionY: 9,
         direction: "RIGHT",
       }),
     ).rejects.toThrow("다른 사용자가 있어 이동할 수 없습니다");
   });
 
   it("allows moving into an empty tile", async () => {
-    presenceRepository.listOnlineByRoom.mockResolvedValue([
-      {
-        id: "session-a",
-        roomId: "room-1",
-        positionX: 8,
-        positionY: 10,
-        direction: "RIGHT",
-        status: "ONLINE",
-      },
-    ]);
+    presenceRepository.findRoomById.mockResolvedValue({
+      id: "room-1",
+      width: 12,
+      height: 11,
+    });
+    presenceRepository.listOnlineByRoom.mockResolvedValue([]);
     presenceRepository.updatePosition.mockResolvedValue({
       id: "session-a",
       roomId: "room-1",
-      positionX: 9,
+      positionX: 6,
       positionY: 10,
-      direction: "RIGHT",
+      direction: "DOWN",
       status: "ONLINE",
     });
 
     await expect(
       presenceService.updatePosition("session-a", {
         roomId: "room-1",
-        positionX: 9,
+        positionX: 6,
         positionY: 10,
-        direction: "RIGHT",
+        direction: "DOWN",
       }),
     ).resolves.toMatchObject({
-      positionX: 9,
+      positionX: 6,
       positionY: 10,
     });
+  });
+
+  it("blocks moving outside the room bounds", async () => {
+    presenceRepository.findRoomById.mockResolvedValue({
+      id: "room-1",
+      width: 12,
+      height: 11,
+    });
+    presenceRepository.listOnlineByRoom.mockResolvedValue([]);
+
+    await expect(
+      presenceService.updatePosition("session-a", {
+        roomId: "room-1",
+        positionX: 12,
+        positionY: 9,
+        direction: "RIGHT",
+      }),
+    ).rejects.toThrow("이동하려는 위치는 보이는 맵 밖입니다");
+  });
+
+  it("spawns the first session at the origin", async () => {
+    presenceRepository.findRoomById.mockResolvedValue({
+      id: "room-1",
+      width: 12,
+      height: 11,
+    });
+    presenceRepository.listOnlineByRoom.mockResolvedValue([]);
+    presenceRepository.create.mockResolvedValue({
+      id: "session-a",
+      roomId: "room-1",
+      positionX: 0,
+      positionY: 0,
+      direction: "UP",
+      status: "ONLINE",
+    });
+    prismaService.room.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(
+      presenceService.createSession({
+        roomId: "room-1",
+        displayName: "tester1",
+      } as never),
+    ).resolves.toMatchObject({
+      positionX: 0,
+      positionY: 0,
+    });
+
+    expect(presenceRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        positionX: 0,
+        positionY: 0,
+      }),
+    );
   });
 
   it("creates a session in a free spawn tile when other sessions already occupy the room", async () => {
     presenceRepository.findRoomById.mockResolvedValue({
       id: "room-1",
-      width: 3,
-      height: 1,
+      width: 12,
+      height: 11,
     });
     presenceRepository.listOnlineByRoom.mockResolvedValue([
       {
@@ -132,25 +186,16 @@ describe("PresenceService", () => {
         direction: "RIGHT",
         status: "ONLINE",
       },
-      {
-        id: "session-b",
-        roomId: "room-1",
-        positionX: 1,
-        positionY: 0,
-        direction: "LEFT",
-        status: "ONLINE",
-      },
     ]);
     presenceRepository.create.mockResolvedValue({
       id: "session-c",
       roomId: "room-1",
-      positionX: 2,
-      positionY: 0,
+      positionX: 0,
+      positionY: 1,
       direction: "UP",
       status: "ONLINE",
     });
     prismaService.room.updateMany.mockResolvedValue({ count: 1 });
-    const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0);
 
     await expect(
       presenceService.createSession({
@@ -158,15 +203,14 @@ describe("PresenceService", () => {
         displayName: "tester3",
       } as never),
     ).resolves.toMatchObject({
-      positionX: 2,
-      positionY: 0,
+      positionX: 0,
+      positionY: 1,
     });
 
     expect(presenceRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        positionX: 2,
-        positionY: 0,
-        direction: "UP",
+        positionX: 0,
+        positionY: 1,
       }),
     );
     expect(prismaService.room.updateMany).toHaveBeenCalledWith({
@@ -178,7 +222,5 @@ describe("PresenceService", () => {
         ownerSessionId: "session-c",
       },
     });
-
-    randomSpy.mockRestore();
   });
 });

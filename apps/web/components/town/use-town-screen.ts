@@ -13,6 +13,7 @@ import {
 import { isFacingEachOther } from "@/lib/facing";
 import { clearTownSnapshot, loadTownSnapshot, saveTownSnapshot } from "@/lib/storage";
 import type { ChatMessage, Conversation, DeveloperSession, Direction, Room } from "@/lib/types";
+import { OFFICE_ROOM_PRESET } from "../room-presets";
 import { buildOfficeLayout } from "./office-map";
 import { createMovePlan } from "./movement";
 
@@ -129,8 +130,8 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
           id: initialRoomId,
           name: "개발자 타운",
           inviteCode: "UNKNOWN",
-          width: 20,
-          height: 12,
+          width: OFFICE_ROOM_PRESET.width,
+          height: OFFICE_ROOM_PRESET.height,
         },
       );
     }

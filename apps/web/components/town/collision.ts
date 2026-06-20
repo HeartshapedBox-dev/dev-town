@@ -1,4 +1,4 @@
-import type { DeveloperSession } from "../../lib/types";
+import type { DeveloperSession, Direction } from "../../lib/types";
 import type { OfficeLayout, OfficeFurniture } from "./office-map";
 import { getBlockingFurniture, isBlockedTile } from "./office-map";
 
@@ -56,6 +56,28 @@ export function getBlockedMoveMessage(blockingItem: OfficeFurniture | null) {
   }
 }
 
+export function getBlockedRoomBoundaryMessage(
+  direction: Direction,
+  positionX: number,
+  positionY: number,
+) {
+  const directionLabel = getDirectionLabel(direction);
+  return `${directionLabel} 이동 목적지 (${positionX}, ${positionY})는 보이는 맵 밖입니다.`;
+}
+
 export function getBlockedSessionMoveMessage() {
   return "다른 사용자가 있어 이동할 수 없습니다";
+}
+
+function getDirectionLabel(direction: Direction) {
+  switch (direction) {
+    case "UP":
+      return "위";
+    case "DOWN":
+      return "아래";
+    case "LEFT":
+      return "왼쪽";
+    case "RIGHT":
+      return "오른쪽";
+  }
 }

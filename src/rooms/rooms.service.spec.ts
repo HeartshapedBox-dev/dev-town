@@ -40,6 +40,33 @@ describe("RoomsService", () => {
     prismaService as never,
   );
 
+  it("creates a room with the office size regardless of request values", async () => {
+    roomsRepository.create.mockResolvedValue({
+      id: "room-1",
+      name: "개발자 타운",
+      inviteCode: "ABCD12",
+      width: 12,
+      height: 11,
+    });
+
+    await expect(
+      roomsService.createRoom({
+        width: 99,
+        height: 99,
+      } as never),
+    ).resolves.toMatchObject({
+      width: 12,
+      height: 11,
+    });
+
+    expect(roomsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        width: 12,
+        height: 11,
+      }),
+    );
+  });
+
   it("deletes room data in the correct order", async () => {
     await roomsService.destroyRoom("room-1");
 

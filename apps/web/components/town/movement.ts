@@ -4,6 +4,7 @@ import type { DeveloperSession, Direction, Room } from "../../lib/types";
 import type { OfficeLayout } from "./office-map";
 import {
   getBlockedMoveMessage,
+  getBlockedRoomBoundaryMessage,
   getBlockedSessionMoveMessage,
   getBlockingItem,
   getBlockingSession,
@@ -44,13 +45,13 @@ export function createMoveCommand(
   direction: Direction,
   room: Pick<Room, "id" | "width" | "height">,
 ): MoveSocketPayload {
-  const delta = MOVE_DELTAS[direction];
+  const nextPosition = getNextPosition(session, direction);
 
   return {
     sessionId: session.id,
     roomId: room.id,
-    positionX: clamp(session.positionX + delta.x, 0, room.width - 1),
-    positionY: clamp(session.positionY + delta.y, 0, room.height - 1),
+    positionX: clamp(nextPosition.positionX, 0, Math.max(room.width - 1, 0)),
+    positionY: clamp(nextPosition.positionY, 0, Math.max(room.height - 1, 0)),
     direction,
   };
 }
@@ -62,8 +63,17 @@ export function createMovePlan(
   layout: OfficeLayout | null,
   sessions: DeveloperSession[] = [],
 ): MovePlan {
+  const targetPosition = getNextPosition(session, direction);
   const command = createMoveCommand(session, direction, room);
-  const blockingSession = getBlockingSession(sessions, session.id, command.positionX, command.positionY);
+
+  if (!isWithinRoomBounds(targetPosition.positionX, targetPosition.positionY, room)) {
+    return {
+      blocked: true,
+      message: getBlockedRoomBoundaryMessage(direction, targetPosition.positionX, targetPosition.positionY),
+    };
+  }
+
+  const blockingSession = getBlockingSession(sessions, session.id, targetPosition.positionX, targetPosition.positionY);
   if (blockingSession) {
     return {
       blocked: true,
@@ -71,7 +81,7 @@ export function createMovePlan(
     };
   }
 
-  const blockingItem = layout ? getBlockingItem(layout, command.positionX, command.positionY) : null;
+  const blockingItem = layout ? getBlockingItem(layout, targetPosition.positionX, targetPosition.positionY) : null;
 
   if (blockingItem) {
     return {
@@ -85,18 +95,31 @@ export function createMovePlan(
     session: {
       ...session,
       roomId: command.roomId,
-      positionX: command.positionX,
-      positionY: command.positionY,
+      positionX: targetPosition.positionX,
+      positionY: targetPosition.positionY,
       direction: command.direction,
     },
     updatePosition: {
       roomId: command.roomId,
-      positionX: command.positionX,
-      positionY: command.positionY,
+      positionX: targetPosition.positionX,
+      positionY: targetPosition.positionY,
       direction: command.direction,
     },
     socketPayload: command,
   };
+}
+
+function getNextPosition(session: Pick<DeveloperSession, "positionX" | "positionY">, direction: Direction) {
+  const delta = MOVE_DELTAS[direction];
+
+  return {
+    positionX: session.positionX + delta.x,
+    positionY: session.positionY + delta.y,
+  };
+}
+
+function isWithinRoomBounds(positionX: number, positionY: number, room: Pick<Room, "width" | "height">) {
+  return positionX >= 0 && positionY >= 0 && positionX < room.width && positionY < room.height;
 }
 
 function clamp(value: number, min: number, max: number) {

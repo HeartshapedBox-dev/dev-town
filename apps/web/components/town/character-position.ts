@@ -8,6 +8,13 @@ type PositionOffset = {
   y?: number;
 };
 
+export function getVisibleCharacterPosition(candidate: PositionCandidate, room: PositionRoom) {
+  return {
+    positionX: clamp(candidate.positionX, 0, Math.max(room.width - 1, 0)),
+    positionY: clamp(candidate.positionY, 0, Math.max(room.height - 1, 0)),
+  };
+}
+
 export function getCharacterPositionStyle(
   candidate: PositionCandidate,
   room: PositionRoom,
@@ -15,10 +22,15 @@ export function getCharacterPositionStyle(
 ) {
   const x = offset.x ?? 0;
   const y = offset.y ?? 0;
+  const visiblePosition = getVisibleCharacterPosition(candidate, room);
 
   return {
-    left: `${((candidate.positionX + 0.5) / room.width) * 100}%`,
-    top: `${((candidate.positionY + 0.5) / room.height) * 100}%`,
+    left: `${((visiblePosition.positionX + 0.5) / Math.max(room.width, 1)) * 100}%`,
+    top: `${((visiblePosition.positionY + 0.5) / Math.max(room.height, 1)) * 100}%`,
     transform: `translate(calc(-50% + ${x}px), calc(-72% + ${y}px))`,
   };
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }

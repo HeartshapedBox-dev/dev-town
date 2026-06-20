@@ -3,7 +3,7 @@ import { createMoveCommand, createMovePlan } from "./movement";
 
 describe("createMovePlan", () => {
   it("separates the socket sessionId from the REST position payload", () => {
-    const room = { id: "room-1", name: "Dev Town", inviteCode: "ABCD12", width: 20, height: 12 };
+    const room = { id: "room-1", name: "Dev Town", inviteCode: "ABCD12", width: 12, height: 11 };
     const session = {
       id: "session-1",
       displayName: "Tester",
@@ -47,7 +47,7 @@ describe("createMovePlan", () => {
   });
 
   it("blocks movement into furniture tiles", () => {
-    const room = { id: "room-1", name: "Dev Town", inviteCode: "ABCD12", width: 20, height: 12 };
+    const room = { id: "room-1", name: "Dev Town", inviteCode: "ABCD12", width: 12, height: 11 };
     const layout = buildOfficeLayout(room.width, room.height);
     const blockingItem = layout.furniture.find((item) => item.blocksMovement && item.x > 0) ?? layout.furniture[0];
     const session = {
@@ -72,7 +72,7 @@ describe("createMovePlan", () => {
   });
 
   it("blocks movement into another online session tile", () => {
-    const room = { id: "room-1", name: "Dev Town", inviteCode: "ABCD12", width: 20, height: 12 };
+    const room = { id: "room-1", name: "Dev Town", inviteCode: "ABCD12", width: 12, height: 11 };
     const session = {
       id: "session-1",
       displayName: "Tester",
@@ -108,7 +108,7 @@ describe("createMovePlan", () => {
   });
 
   it("allows movement into empty tiles", () => {
-    const room = { id: "room-1", name: "Dev Town", inviteCode: "ABCD12", width: 20, height: 12 };
+    const room = { id: "room-1", name: "Dev Town", inviteCode: "ABCD12", width: 12, height: 11 };
     const session = {
       id: "session-1",
       displayName: "Tester",
@@ -127,5 +127,44 @@ describe("createMovePlan", () => {
       throw new Error("expected unblocked move plan");
     }
     expect(plan.session.positionX).toBe(1);
+  });
+
+  it("allows movement on the last visible row and blocks the next visible column", () => {
+    const room = { id: "room-1", name: "Dev Town", inviteCode: "ABCD12", width: 12, height: 11 };
+    const layout = buildOfficeLayout(room.width, room.height);
+    const session = {
+      id: "session-1",
+      displayName: "Tester",
+      avatarColor: "#2563eb",
+      roomId: room.id,
+      positionX: 6,
+      positionY: 9,
+      direction: "DOWN" as const,
+      status: "ONLINE" as const,
+    };
+
+    const downPlan = createMovePlan(session, room, "DOWN", layout, [session]);
+
+    expect(downPlan.blocked).toBe(false);
+    if (downPlan.blocked) {
+      throw new Error("expected unblocked move plan");
+    }
+    expect(downPlan.session.positionY).toBe(10);
+
+    const blockedSession = {
+      ...session,
+      positionX: 11,
+      positionY: 9,
+      direction: "RIGHT" as const,
+    };
+
+    const rightPlan = createMovePlan(blockedSession, room, "RIGHT", layout, [blockedSession]);
+
+    expect(rightPlan.blocked).toBe(true);
+    if (!rightPlan.blocked) {
+      throw new Error("expected blocked move plan");
+    }
+
+    expect(rightPlan.message).toBe("오른쪽 이동 목적지 (12, 9)는 보이는 맵 밖입니다.");
   });
 });

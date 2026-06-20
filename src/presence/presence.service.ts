@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { DeveloperSession, Direction } from "@prisma/client";
 import { CreateSessionDto } from "./dto/create-session.dto";
 import { UpdatePositionDto } from "./dto/update-position.dto";
@@ -56,6 +56,8 @@ export class PresenceService {
 
   async updatePosition(sessionId: string, dto: UpdatePositionDto) {
     const { roomId, positionX, positionY, direction } = dto;
+    const room = await this.getRoomOrThrow(roomId);
+    this.assertPositionWithinRoomBounds(room.width, room.height, positionX, positionY);
     await this.assertNoSessionCollision(sessionId, roomId, positionX, positionY);
     return this.presenceRepository.updatePosition(sessionId, {
       roomId,
@@ -131,28 +133,28 @@ export class PresenceService {
   private async pickSpawnPoint(roomId: string, width: number, height: number) {
     const occupiedSessions = await this.listRoomSessions(roomId);
     const occupied = new Set(occupiedSessions.map((session) => `${session.positionX}:${session.positionY}`));
-    const coordinates: Array<{ positionX: number; positionY: number }> = [];
-
-    for (let positionY = 0; positionY < Math.max(height, 1); positionY += 1) {
-      for (let positionX = 0; positionX < Math.max(width, 1); positionX += 1) {
-        if (!occupied.has(`${positionX}:${positionY}`)) {
-          coordinates.push({ positionX, positionY });
-        }
-      }
-    }
-
-    const position =
-      coordinates.length > 0
-        ? coordinates[this.pickRandomNumber(coordinates.length)]
-        : {
-            positionX: this.pickRandomNumber(width),
-            positionY: this.pickRandomNumber(height),
-          };
+    const position = this.findFirstAvailablePosition(occupied, width, height);
 
     return {
       ...position,
       direction: this.pickRandomDirection(),
     };
+  }
+
+  private findFirstAvailablePosition(
+    occupied: Set<string>,
+    width: number,
+    height: number,
+  ): { positionX: number; positionY: number } {
+    for (let positionX = 0; positionX < Math.max(width, 1); positionX += 1) {
+      for (let positionY = 0; positionY < Math.max(height, 1); positionY += 1) {
+        if (!occupied.has(`${positionX}:${positionY}`)) {
+          return { positionX, positionY };
+        }
+      }
+    }
+
+    return { positionX: 0, positionY: 0 };
   }
 
   private async markRoomOwnerIfMissing(roomId: string, ownerSessionId: string) {
@@ -184,6 +186,12 @@ export class PresenceService {
 
     if (blockingSession) {
       throw new ConflictException("다른 사용자가 있어 이동할 수 없습니다");
+    }
+  }
+
+  private assertPositionWithinRoomBounds(width: number, height: number, positionX: number, positionY: number) {
+    if (positionX < 0 || positionY < 0 || positionX >= width || positionY >= height) {
+      throw new BadRequestException("이동하려는 위치는 보이는 맵 밖입니다");
     }
   }
 }

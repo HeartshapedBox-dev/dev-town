@@ -3,7 +3,7 @@
 import type { DeveloperSession, Direction, Room } from "@/lib/types";
 import { directionArrow } from "@/lib/facing";
 import { CharacterAvatar } from "./character-avatar";
-import { getCharacterPositionStyle } from "./character-position";
+import { getCharacterPositionStyle, getVisibleCharacterPosition } from "./character-position";
 import type { OfficeLayout } from "./office-map";
 import { createTileKey, getFurnitureClassName, getTileClassName } from "./office-map";
 import styles from "./town-board.module.css";
@@ -35,7 +35,8 @@ export function TownBoard({
 }: TownBoardProps) {
   const positionCounts = new Map<string, number>();
   sessions.forEach((candidate) => {
-    const key = createTileKey(candidate.positionX, candidate.positionY);
+    const visiblePosition = getVisibleCharacterPosition(candidate, layout);
+    const key = createTileKey(visiblePosition.positionX, visiblePosition.positionY);
     positionCounts.set(key, (positionCounts.get(key) ?? 0) + 1);
   });
 
@@ -109,12 +110,13 @@ export function TownBoard({
               {sessions.map((candidate) => {
                 const isCurrent = candidate.id === session.id;
                 const isSelected = candidate.id === selectedPeerId;
-                const tileKey = createTileKey(candidate.positionX, candidate.positionY);
+                const visiblePosition = getVisibleCharacterPosition(candidate, layout);
+                const tileKey = createTileKey(visiblePosition.positionX, visiblePosition.positionY);
                 const duplicateCount = positionCounts.get(tileKey) ?? 1;
                 const duplicateIndex = positionUsage.get(tileKey) ?? 0;
                 positionUsage.set(tileKey, duplicateIndex + 1);
                 const spread = duplicateCount > 1 ? duplicateIndex - (duplicateCount - 1) / 2 : 0;
-                const positionStyle = getCharacterPositionStyle(candidate, room, {
+                const positionStyle = getCharacterPositionStyle(candidate, layout, {
                   x: spread * 14,
                   y: duplicateCount > 1 ? Math.abs(spread) * -4 : 0,
                 });
@@ -130,7 +132,7 @@ export function TownBoard({
                     ].join(" ")}
                     style={positionStyle}
                     onClick={() => onSelectPeer(candidate.id === session.id ? null : candidate.id)}
-                    title={`${candidate.displayName} · ${candidate.positionX}, ${candidate.positionY} · ${candidate.direction} · 0-base`}
+                    title={`${candidate.displayName} · ${visiblePosition.positionX}, ${visiblePosition.positionY} · ${candidate.direction} · 0-base`}
                   >
                     <span className={styles.badge} style={{ background: candidate.avatarColor }} />
                     <span className={styles.characterDirection} aria-hidden="true">
@@ -143,7 +145,9 @@ export function TownBoard({
                       label={`${candidate.displayName} 캐릭터`}
                     />
                     <span className={styles.characterName}>{candidate.displayName}</span>
-                    <span className={styles.characterMeta}>{candidate.positionX}, {candidate.positionY}</span>
+                    <span className={styles.characterMeta}>
+                      {visiblePosition.positionX}, {visiblePosition.positionY}
+                    </span>
                   </button>
                 );
               })}

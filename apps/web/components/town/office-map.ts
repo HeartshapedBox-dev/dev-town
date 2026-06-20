@@ -118,39 +118,39 @@ export function buildOfficeLayout(width: number, height: number): OfficeLayout {
     }
   }
 
-  const loungeX = scaledPosition(0.58, 4, safeWidth);
-  const loungeY = scaledPosition(0.72, 3, safeHeight);
-  const meetingX = scaledPosition(0.55, 5, safeWidth);
-  const meetingY = scaledPosition(0.18, 4, safeHeight);
-  const deskX = scaledPosition(0.1, 4, safeWidth);
-  const deskY = scaledPosition(0.18, 2, safeHeight);
-  const sideCabinetX = scaledPosition(0.12, 2, safeWidth);
-  const sideCabinetY = scaledPosition(0.72, 2, safeHeight);
-  const boardX = scaledPosition(0.82, 2, safeWidth);
-  const boardY = scaledPosition(0.28, 3, safeHeight);
-  const coffeeX = scaledPosition(0.44, 2, safeWidth);
-  const coffeeY = scaledPosition(0.76, 2, safeHeight);
-  const coolerX = scaledPosition(0.18, 1, safeWidth);
-  const coolerY = scaledPosition(0.53, 2, safeHeight);
+  const deskX = clamp(safeWidth >= 12 ? 2 : scaledPosition(0.22, 3, safeWidth, 1), 0, Math.max(safeWidth - 3, 0));
+  const deskY = clamp(safeHeight >= 11 ? 2 : scaledPosition(0.18, 2, safeHeight, 1), 0, Math.max(safeHeight - 3, 0));
+  const meetingX = clamp(safeWidth >= 12 ? 7 : scaledPosition(0.63, 4, safeWidth, 1), 0, Math.max(safeWidth - 4, 0));
+  const meetingY = clamp(safeHeight >= 11 ? 2 : scaledPosition(0.2, 3, safeHeight, 1), 0, Math.max(safeHeight - 3, 0));
+  const boardX = clamp(safeWidth >= 12 ? 9 : scaledPosition(0.82, 2, safeWidth, 1), 0, Math.max(safeWidth - 2, 0));
+  const boardY = clamp(safeHeight >= 11 ? 3 : scaledPosition(0.28, 3, safeHeight, 1), 0, Math.max(safeHeight - 3, 0));
+  const cabinetX = clamp(safeWidth >= 12 ? 9 : scaledPosition(0.78, 2, safeWidth, 1), 0, Math.max(safeWidth - 2, 0));
+  const cabinetY = clamp(safeHeight >= 11 ? 7 : scaledPosition(0.7, 2, safeHeight, 1), 0, Math.max(safeHeight - 2, 0));
+  const loungeX = clamp(safeWidth >= 12 ? 7 : scaledPosition(0.72, 3, safeWidth, 1), 0, Math.max(safeWidth - 3, 0));
+  const loungeY = clamp(safeHeight >= 11 ? 8 : scaledPosition(0.8, 2, safeHeight, 1), 0, Math.max(safeHeight - 2, 0));
+  const coffeeX = clamp(safeWidth >= 12 ? 5 : scaledPosition(0.52, 2, safeWidth, 1), 0, Math.max(safeWidth - 2, 0));
+  const coffeeY = clamp(safeHeight >= 11 ? 7 : scaledPosition(0.62, 2, safeHeight, 1), 0, Math.max(safeHeight - 1, 0));
+  const coolerX = clamp(safeWidth >= 12 ? 1 : scaledPosition(0.2, 1, safeWidth, 1), 0, Math.max(safeWidth - 1, 0));
+  const coolerY = clamp(safeHeight >= 11 ? 5 : scaledPosition(0.56, 2, safeHeight, 1), 0, Math.max(safeHeight - 2, 0));
 
-  fillRect(tiles, safeWidth, safeHeight, "carpet", meetingX, meetingY, 5, 4);
-  fillRect(tiles, safeWidth, safeHeight, "walkway", Math.max(1, Math.floor(safeWidth / 2) - 1), 0, 2, safeHeight);
-  fillRect(tiles, safeWidth, safeHeight, "walkway", 0, Math.max(1, Math.floor(safeHeight / 2) - 1), safeWidth, 2);
-  fillRect(tiles, safeWidth, safeHeight, "carpet", loungeX, loungeY, 4, 3);
+  fillRect(tiles, safeWidth, safeHeight, "carpet", meetingX - 1, meetingY - 1, 6, 4);
+  fillRect(tiles, safeWidth, safeHeight, "walkway", Math.max(2, Math.floor(safeWidth / 2) - 1), 0, 2, safeHeight);
+  fillRect(tiles, safeWidth, safeHeight, "walkway", 0, Math.max(2, Math.floor(safeHeight / 2) - 1), safeWidth, 2);
+  fillRect(tiles, safeWidth, safeHeight, "carpet", loungeX - 1, loungeY - 1, 4, 3);
 
-  addFurniture(furniture, "conference", "회의 테이블", meetingX + 1, meetingY + 1, 3, 2, true, "back");
-  addFurniture(furniture, "chair", "회의 의자", meetingX, meetingY + 1, 1, 1, false, "front");
-  addFurniture(furniture, "chair", "회의 의자", meetingX + 4, meetingY + 1, 1, 1, false, "front");
-  addFurniture(furniture, "chair", "회의 의자", meetingX + 1, meetingY, 1, 1, false, "front");
+  addFurniture(furniture, "conference", "회의 테이블", meetingX, meetingY, 3, 1, true, "back");
+  addFurniture(furniture, "chair", "회의 의자", meetingX - 1, meetingY, 1, 1, false, "front");
   addFurniture(furniture, "chair", "회의 의자", meetingX + 3, meetingY, 1, 1, false, "front");
-  addFurniture(furniture, "desk", "공용 책상", deskX, deskY, 4, 2, true, "back");
+  addFurniture(furniture, "chair", "회의 의자", meetingX, meetingY - 1, 1, 1, false, "front");
+  addFurniture(furniture, "chair", "회의 의자", meetingX + 2, meetingY - 1, 1, 1, false, "front");
+  addFurniture(furniture, "desk", "공용 책상", deskX, deskY, 3, 2, true, "back");
   addFurniture(furniture, "chair", "책상 의자", deskX, deskY + 2, 1, 1, false, "front");
-  addFurniture(furniture, "chair", "책상 의자", deskX + 3, deskY + 2, 1, 1, false, "front");
+  addFurniture(furniture, "chair", "책상 의자", deskX + 2, deskY + 2, 1, 1, false, "front");
   addFurniture(furniture, "plant", "식물", Math.max(0, safeWidth - 2), 0, 1, 1, true, "front");
   addFurniture(furniture, "plant", "식물", 0, Math.max(0, safeHeight - 1), 1, 1, true, "front");
-  addFurniture(furniture, "cabinet", "수납장", sideCabinetX, sideCabinetY, 2, 2, true, "back");
+  addFurniture(furniture, "cabinet", "수납장", cabinetX, cabinetY, 2, 2, true, "back");
   addFurniture(furniture, "whiteboard", "회의실 보드", boardX, boardY, 2, 3, true, "back");
-  addFurniture(furniture, "sofa", "라운지 소파", loungeX, loungeY, 4, 1, true, "front");
+  addFurniture(furniture, "sofa", "라운지 소파", loungeX, loungeY, 3, 1, true, "front");
   addFurniture(furniture, "coffee", "커피 테이블", coffeeX, coffeeY, 2, 1, true, "front");
   addFurniture(furniture, "waterCooler", "워터쿨러", coolerX, coolerY, 1, 2, true, "front");
 

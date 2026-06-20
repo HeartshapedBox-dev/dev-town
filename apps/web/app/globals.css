@@ -209,21 +209,57 @@ textarea {
 }
 
 .input,
-.textarea {
+.textarea,
+select.input {
   width: 100%;
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 16px;
   padding: 14px 15px;
   color: var(--text);
   background: rgba(3, 8, 17, 0.82);
+  font: inherit;
+  line-height: 1.35;
+  box-sizing: border-box;
   outline: none;
   transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .input:focus,
-.textarea:focus {
+.textarea:focus,
+select.input:focus {
   border-color: rgba(125, 211, 252, 0.8);
   box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+}
+
+.input,
+select.input {
+  min-height: 48px;
+}
+
+.select-shell {
+  position: relative;
+}
+
+.select-shell::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(199, 216, 239, 0.9);
+  border-bottom: 2px solid rgba(199, 216, 239, 0.9);
+  transform: translateY(-62%) rotate(45deg);
+  pointer-events: none;
+}
+
+select.input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 44px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+  cursor: pointer;
 }
 
 .textarea {
