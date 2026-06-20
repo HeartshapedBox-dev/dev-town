@@ -1,14 +1,14 @@
 import { TownClient } from "@/components/town-client";
 
 type TownPageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     roomId?: string;
     sessionId?: string;
-  };
+  }>;
 };
 
-export default function TownPage({ searchParams }: TownPageProps) {
-  const params = searchParams ?? {};
+export default async function TownPage({ searchParams }: TownPageProps) {
+  const params = (await searchParams) ?? {};
   return (
     <TownClient
       initialRoomId={params.roomId}

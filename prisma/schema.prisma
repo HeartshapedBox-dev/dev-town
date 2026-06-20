@@ -32,6 +32,7 @@ model DeveloperSession {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   room          Room           @relation(fields: [roomId], references: [id])
+  ownedRoom     Room?          @relation("RoomOwner")
   sentMessages  ChatMessage[]  @relation("MessageSender")
   conversationsA Conversation[] @relation("ConversationParticipantA")
   conversationsB Conversation[] @relation("ConversationParticipantB")
@@ -41,15 +42,17 @@ model DeveloperSession {
 }
 
 model Room {
-  id            String             @id @default(uuid())
-  name          String
-  inviteCode    String             @unique
-  width         Int                @default(20)
-  height        Int                @default(12)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  sessions      DeveloperSession[]
-  conversations Conversation[]
+  id              String             @id @default(uuid())
+  name            String
+  inviteCode      String             @unique
+  width           Int                @default(20)
+  height          Int                @default(12)
+  ownerSessionId  String?            @unique
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  sessions        DeveloperSession[]
+  conversations   Conversation[]
+  ownerSession    DeveloperSession?  @relation("RoomOwner", fields: [ownerSessionId], references: [id], onDelete: SetNull)
 
   @@index([inviteCode])
 }

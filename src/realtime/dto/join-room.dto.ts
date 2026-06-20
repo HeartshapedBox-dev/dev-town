@@ -5,4 +5,8 @@ export class JoinRoomDto {
   @IsString()
   @MinLength(1)
   roomId!: string;
+
+  @IsString()
+  @MinLength(1)
+  sessionId!: string;
 }

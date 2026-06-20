@@ -11,7 +11,27 @@ export class RoomsRepository {
     return this.prisma.room.create({ data });
   }
 
+  findById(id: string) {
+    return this.prisma.room.findUnique({ where: { id } });
+  }
+
   findByInviteCode(inviteCode: string) {
     return this.prisma.room.findUnique({ where: { inviteCode } });
+  }
+
+  updateOwnerIfMissing(roomId: string, ownerSessionId: string) {
+    return this.prisma.room.updateMany({
+      where: {
+        id: roomId,
+        ownerSessionId: null,
+      },
+      data: {
+        ownerSessionId,
+      },
+    });
+  }
+
+  deleteById(id: string) {
+    return this.prisma.room.delete({ where: { id } });
   }
 }

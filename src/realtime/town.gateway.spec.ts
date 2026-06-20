@@ -3,9 +3,11 @@ import { TownGateway } from "./town.gateway";
 type MockSocket = {
   id: string;
   rooms: Set<string>;
+  data: Record<string, unknown>;
   join: jest.Mock<Promise<void>, [string]>;
   leave: jest.Mock<Promise<void>, [string]>;
   emit: jest.Mock<void, [string, unknown]>;
+  disconnect: jest.Mock<void, [boolean?]>;
 };
 
 type SessionLike = {
@@ -21,6 +23,7 @@ function createMockSocket(id: string): MockSocket {
   return {
     id,
     rooms,
+    data: {},
     join: jest.fn(async (room: string) => {
       rooms.add(room);
     }),
@@ -28,6 +31,7 @@ function createMockSocket(id: string): MockSocket {
       rooms.delete(room);
     }),
     emit: jest.fn(),
+    disconnect: jest.fn(),
   };
 }
 
@@ -54,6 +58,8 @@ describe("TownGateway", () => {
     listRoomSessions: jest.Mock;
     updatePosition: jest.Mock;
     canStartConversation: jest.Mock;
+    getSessionOrThrow: jest.Mock;
+    markOffline: jest.Mock;
   };
   let chatService: {
     findOrCreateConversation: jest.Mock;
@@ -61,6 +67,12 @@ describe("TownGateway", () => {
   };
   let roomsService: {
     joinByInviteCode: jest.Mock;
+    destroyRoom: jest.Mock;
+  };
+  let prismaService: {
+    room: {
+      findUnique: jest.Mock;
+    };
   };
   let server: ReturnType<typeof createServerMock>;
   let socketA: MockSocket;
@@ -116,8 +128,10 @@ describe("TownGateway", () => {
             left.positionY === right.positionY &&
             left.direction === "LEFT" &&
             right.direction === "RIGHT")
-        );
+          );
       }),
+      getSessionOrThrow: jest.fn(),
+      markOffline: jest.fn(),
     };
 
     chatService = {
@@ -127,12 +141,20 @@ describe("TownGateway", () => {
 
     roomsService = {
       joinByInviteCode: jest.fn(),
+      destroyRoom: jest.fn(),
+    };
+
+    prismaService = {
+      room: {
+        findUnique: jest.fn(),
+      },
     };
 
     gateway = new TownGateway(
       presenceService as never,
       chatService as never,
       roomsService as never,
+      prismaService as never,
     );
     (gateway as unknown as { server: typeof server }).server = server;
   });
@@ -155,6 +177,7 @@ describe("TownGateway", () => {
     });
     expect(server.to).toHaveBeenCalledWith("conversation:conversation-1");
     expect(server.emit).toHaveBeenCalledWith("conversationOpened", conversation);
+    expect(server.emit).toHaveBeenCalledWith("roomSessionsSynced", [sessionA, sessionBAfterJoin]);
     expect(socketA.join).toHaveBeenCalledWith("conversation:conversation-1");
     expect(socketB.join).toHaveBeenCalledWith("conversation:conversation-1");
   });
@@ -193,6 +216,7 @@ describe("TownGateway", () => {
       participantAId: "session-a",
       participantBId: "session-b",
     });
+    expect(server.emit).toHaveBeenCalledWith("roomSessionsSynced", [sessionA, sessionBAfterMoveAway]);
     expect(socketA.leave).toHaveBeenCalledWith("conversation:conversation-1");
     expect(socketB.leave).toHaveBeenCalledWith("conversation:conversation-1");
   });
@@ -230,5 +254,60 @@ describe("TownGateway", () => {
     });
     expect(socketA.leave).toHaveBeenCalledWith("conversation:conversation-1");
     expect(socketB.leave).toHaveBeenCalledWith("conversation:conversation-1");
+  });
+
+  it("marks a non-owner session offline and emits sessionEnded on manual leave", async () => {
+    prismaService.room.findUnique.mockResolvedValue({
+      id: room.id,
+      ownerSessionId: "session-a",
+    });
+    presenceService.getSessionOrThrow = jest.fn(async () => ({
+      id: "session-b",
+      roomId: room.id,
+      positionX: 2,
+      positionY: 1,
+      direction: "LEFT",
+    }));
+    presenceService.markOffline = jest.fn(async () => undefined);
+    roomSessions = [sessionA, sessionBAfterJoin];
+
+    await gateway.joinRoom(socketB as never, { roomId: room.id, sessionId: "session-b" } as never);
+    await gateway.leaveSession(socketB as never);
+
+    expect(presenceService.markOffline).toHaveBeenCalledWith("session-b");
+    expect(server.emit).toHaveBeenCalledWith("sessionEnded", {
+      roomId: room.id,
+      sessionId: "session-b",
+      reason: "manual",
+    });
+    expect(roomsService.destroyRoom).not.toHaveBeenCalled();
+  });
+
+  it("destroys the room and disconnects everyone when the owner leaves", async () => {
+    prismaService.room.findUnique.mockResolvedValue({
+      id: room.id,
+      ownerSessionId: "session-a",
+    });
+    presenceService.getSessionOrThrow = jest.fn(async () => ({
+      id: "session-a",
+      roomId: room.id,
+      positionX: 1,
+      positionY: 1,
+      direction: "RIGHT",
+    }));
+    presenceService.markOffline = jest.fn(async () => undefined);
+    roomSessions = [sessionA, sessionBAfterJoin];
+    roomsService.destroyRoom.mockResolvedValue(undefined);
+
+    await gateway.joinRoom(socketA as never, { roomId: room.id, sessionId: "session-a" } as never);
+    await gateway.joinRoom(socketB as never, { roomId: room.id, sessionId: "session-b" } as never);
+    await gateway.leaveSession(socketA as never);
+
+    expect(server.emit).toHaveBeenCalledWith("roomClosed", {
+      roomId: room.id,
+      ownerSessionId: "session-a",
+    });
+    expect(roomsService.destroyRoom).toHaveBeenCalledWith(room.id);
+    expect(socketB.disconnect).toHaveBeenCalledWith(true);
   });
 });

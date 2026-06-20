@@ -11,7 +11,7 @@ import {
   updatePosition,
 } from "@/lib/api";
 import { isFacingEachOther } from "@/lib/facing";
-import { loadTownSnapshot, saveTownSnapshot } from "@/lib/storage";
+import { clearTownSnapshot, loadTownSnapshot, saveTownSnapshot } from "@/lib/storage";
 import type { ChatMessage, Conversation, DeveloperSession, Direction, Room } from "@/lib/types";
 import { buildOfficeLayout } from "./office-map";
 import { createMovePlan } from "./movement";
@@ -22,11 +22,13 @@ type UseTownScreenOptions = {
 };
 
 type SocketState = "idle" | "connecting" | "connected" | "disconnected";
+type TerminalState = "room-closed" | "session-ended" | null;
 
 export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreenOptions) {
   const socketRef = useRef<Socket | null>(null);
   const sessionRef = useRef<DeveloperSession | null>(null);
   const conversationRef = useRef<Conversation | null>(null);
+  const selectedPeerRef = useRef<string | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [session, setSession] = useState<DeveloperSession | null>(null);
   const [sessions, setSessions] = useState<DeveloperSession[]>([]);
@@ -37,6 +39,8 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
   const [socketState, setSocketState] = useState<SocketState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<string>("방을 불러오는 중...");
+  const [terminalState, setTerminalState] = useState<TerminalState>(null);
+  const [terminalMessage, setTerminalMessage] = useState<string | null>(null);
 
   const roomSizeLabel = useMemo(() => {
     if (!room) {
@@ -54,17 +58,57 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
     return buildOfficeLayout(room.width, room.height);
   }, [room]);
 
+  const currentSession = useMemo(() => {
+    if (!session) {
+      return null;
+    }
+
+    return sessions.find((candidate) => candidate.id === session.id) ?? session;
+  }, [session, sessions]);
+
+  const peerSessions = useMemo(() => {
+    if (!currentSession) {
+      return sessions;
+    }
+
+    return sessions.filter((candidate) => candidate.id !== currentSession.id);
+  }, [currentSession?.id, sessions]);
+
   const currentPeer = sessions.find((candidate) => candidate.id === selectedPeerId) ?? null;
-  const canOpenConversation = Boolean(session && currentPeer && isFacingEachOther(session, currentPeer));
+  const canOpenConversation = Boolean(currentSession && currentPeer && isFacingEachOther(currentSession, currentPeer));
   const moveNotice = error ?? hint;
 
   useEffect(() => {
-    sessionRef.current = session;
-  }, [session]);
+    sessionRef.current = currentSession;
+  }, [currentSession]);
 
   useEffect(() => {
     conversationRef.current = activeConversation;
   }, [activeConversation]);
+
+  useEffect(() => {
+    selectedPeerRef.current = selectedPeerId;
+  }, [selectedPeerId]);
+
+  useEffect(() => {
+    if (!currentSession) {
+      setSelectedPeerId(null);
+      return;
+    }
+
+    setSelectedPeerId((current) => {
+      const existingPeer = current ? sessions.find((candidate) => candidate.id === current) : null;
+      if (existingPeer && existingPeer.id !== currentSession.id) {
+        return current;
+      }
+
+      if (peerSessions.length === 1) {
+        return peerSessions[0].id;
+      }
+
+      return null;
+    });
+  }, [currentSession?.id, peerSessions, sessions]);
 
   useEffect(() => {
     const snapshot = loadTownSnapshot();
@@ -135,7 +179,7 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
   }, [room]);
 
   useEffect(() => {
-    if (!room?.id || !session?.id) {
+    if (!room?.id || !currentSession?.id) {
       return;
     }
 
@@ -149,7 +193,17 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
 
     socket.on("connect", () => {
       setSocketState("connected");
-      socket.emit("joinRoom", { roomId: room.id }, () => undefined);
+      void socket
+        .timeout(5000)
+        .emitWithAck("joinRoom", { roomId: room.id, sessionId: currentSession.id })
+        .then((latestSessions) => {
+          if (Array.isArray(latestSessions)) {
+            setSessions(latestSessions);
+          }
+        })
+        .catch((cause) => {
+          setError(getMessage(cause));
+        });
 
       if (conversationRef.current) {
         socket.emit("joinConversation", { conversationId: conversationRef.current.id }, () => undefined);
@@ -158,6 +212,8 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
 
     socket.on("disconnect", () => {
       setSocketState("disconnected");
+      setTerminalState((current) => current ?? "session-ended");
+      setTerminalMessage((current) => current ?? "연결이 끊어졌습니다.");
     });
 
     socket.on("characterJoined", (joinedSession) => {
@@ -170,6 +226,12 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
       }
 
       upsertSession(setSessions, movedSession);
+    });
+
+    socket.on("roomSessionsSynced", (latestSessions) => {
+      if (Array.isArray(latestSessions)) {
+        setSessions(latestSessions);
+      }
     });
 
     socket.on("conversationOpened", async (conversation) => {
@@ -198,6 +260,37 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
       setActiveConversation((current) => (current?.id === payload.conversationId ? null : current));
     });
 
+    socket.on("sessionEnded", (payload) => {
+      setSessions((current) => current.filter((candidate) => candidate.id !== payload.sessionId));
+      if (selectedPeerRef.current === payload.sessionId) {
+        setSelectedPeerId(null);
+      }
+      if (payload.sessionId === sessionRef.current?.id) {
+        setTerminalState("session-ended");
+        setTerminalMessage("세션 연결이 종료되었습니다.");
+        setActiveConversation(null);
+        setMessages([]);
+        setDraft("");
+      }
+      setHint(`세션 ${payload.sessionId}가 종료되었습니다.`);
+    });
+
+    socket.on("roomClosed", (payload) => {
+      clearTownSnapshot();
+      setTerminalState("room-closed");
+      setTerminalMessage(`방 ${payload.roomId}가 종료되었습니다.`);
+      setRoom(null);
+      setSession(null);
+      setSessions([]);
+      setSelectedPeerId(null);
+      setActiveConversation(null);
+      setMessages([]);
+      setDraft("");
+      setError(null);
+      setHint("방이 종료되어 연결이 해제되었습니다.");
+      setSocketState("disconnected");
+    });
+
     socket.on("messageCreated", (message) => {
       setMessages((current) => {
         if (current.some((candidate) => candidate.id === message.id)) {
@@ -217,12 +310,17 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [room?.id, session?.id]);
+  }, [currentSession?.id, room?.id]);
 
   useEffect(() => {
     const handler = async () => {
-      if (room && session) {
-        saveTownSnapshot({ room, session });
+      if (terminalState) {
+        clearTownSnapshot();
+        return;
+      }
+
+      if (room && currentSession) {
+        saveTownSnapshot({ room, session: currentSession });
       }
 
       if (socketRef.current?.connected) {
@@ -235,7 +333,7 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
     return () => {
       window.removeEventListener("beforeunload", handler);
     };
-  }, [room, session]);
+  }, [room, currentSession, terminalState]);
 
   async function refreshSessions() {
     if (!room) {
@@ -253,11 +351,11 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
   }
 
   async function handleMove(direction: Direction) {
-    if (!room || !session || !officeLayout) {
+    if (!room || !currentSession || !officeLayout) {
       return;
     }
 
-    const movePlan = createMovePlan(session, room, direction, officeLayout);
+    const movePlan = createMovePlan(currentSession, room, direction, officeLayout, sessions);
     if (movePlan.blocked) {
       const message = movePlan.message;
       setError(message);
@@ -270,23 +368,23 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
     upsertSession(setSessions, movePlan.session);
 
     try {
-      const updated = await updatePosition(session.id, movePlan.updatePosition);
+      const updated = await updatePosition(currentSession.id, movePlan.updatePosition);
       setSession(updated);
       upsertSession(setSessions, updated);
-      setHint(`좌표 (${updated.positionX}, ${updated.positionY})`);
+      setHint(`좌표(0-base) (${updated.positionX}, ${updated.positionY})`);
 
       if (socketRef.current?.connected) {
         socketRef.current.emit("move", movePlan.socketPayload);
       }
     } catch (cause) {
       setError(getMessage(cause));
-      setSession(session);
-      upsertSession(setSessions, session);
+      setSession(currentSession);
+      upsertSession(setSessions, currentSession);
     }
   }
 
   async function handleOpenConversation() {
-    if (!session || !currentPeer) {
+    if (!currentSession || !currentPeer) {
       return;
     }
 
@@ -294,11 +392,11 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
       const socket = socketRef.current;
       const conversation = socket?.connected
         ? await socket.timeout(5000).emitWithAck("openConversation", {
-            requesterSessionId: session.id,
+            requesterSessionId: currentSession.id,
             peerSessionId: currentPeer.id,
           })
         : await findOrCreateConversation({
-            requesterSessionId: session.id,
+            requesterSessionId: currentSession.id,
             peerSessionId: currentPeer.id,
           });
 
@@ -314,7 +412,7 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
   }
 
   async function handleSendMessage() {
-    if (!activeConversation || !session) {
+    if (!activeConversation || !currentSession) {
       return;
     }
 
@@ -328,11 +426,11 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
       const message = socket?.connected
         ? await socket.timeout(5000).emitWithAck("sendMessage", {
             conversationId: activeConversation.id,
-            senderSessionId: session.id,
+            senderSessionId: currentSession.id,
             body,
           })
         : await sendMessage(activeConversation.id, {
-            senderSessionId: session.id,
+            senderSessionId: currentSession.id,
             body,
           });
 
@@ -346,9 +444,37 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
     }
   }
 
+  async function handleDisconnectSession() {
+    const socket = socketRef.current;
+
+    clearTownSnapshot();
+    setError(null);
+    setTerminalState("session-ended");
+    setTerminalMessage("세션 연결을 종료합니다.");
+    setRoom(null);
+    setSession(null);
+    setSessions([]);
+    setSelectedPeerId(null);
+    setActiveConversation(null);
+    setMessages([]);
+    setDraft("");
+    setHint("세션 연결을 종료합니다.");
+
+    if (socket?.connected && currentSession) {
+      try {
+        await socket.timeout(5000).emitWithAck("leaveSession");
+      } catch (cause) {
+        setError(getMessage(cause));
+      }
+    }
+
+    socket?.disconnect();
+    setSocketState("disconnected");
+  }
+
   function handleSelectPeer(peerId: string | null) {
     setSelectedPeerId((current) => {
-      if (peerId === session?.id) {
+      if (peerId === currentSession?.id) {
         return null;
       }
 
@@ -363,7 +489,7 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
 
   return {
     room,
-    session,
+    session: currentSession,
     sessions,
     selectedPeerId,
     activeConversation,
@@ -382,8 +508,11 @@ export function useTownScreen({ initialRoomId, initialSessionId }: UseTownScreen
     handleMove,
     handleOpenConversation,
     handleSendMessage,
+    handleDisconnectSession,
     clearConversation,
     refreshSessions,
+    terminalState,
+    terminalMessage,
   };
 }
 

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PresenceService } from "../presence/presence.service";
+import { PrismaService } from "../prisma/prisma.service";
 import { CreateRoomDto } from "./dto/create-room.dto";
 import { JoinRoomByInviteDto } from "./dto/join-room-by-invite.dto";
 import { RoomsRepository } from "./repositories/rooms.repository";
@@ -11,6 +12,7 @@ export class RoomsService {
   constructor(
     private readonly roomsRepository: RoomsRepository,
     private readonly presenceService: PresenceService,
+    private readonly prismaService: PrismaService,
   ) {}
 
   async createRoom(dto: CreateRoomDto) {
@@ -41,6 +43,39 @@ export class RoomsService {
 
     const session = await this.presenceService.createRandomSession(room, dto.displayName);
     return { room, session };
+  }
+
+  async getRoomOrThrow(roomId: string) {
+    const room = await this.roomsRepository.findById(roomId);
+    if (!room) {
+      throw new NotFoundException("Room not found");
+    }
+
+    return room;
+  }
+
+  async destroyRoom(roomId: string) {
+    await this.prismaService.$transaction(async (tx) => {
+      await tx.chatMessage.deleteMany({
+        where: {
+          conversation: {
+            roomId,
+          },
+        },
+      });
+
+      await tx.conversation.deleteMany({
+        where: { roomId },
+      });
+
+      await tx.developerSession.deleteMany({
+        where: { roomId },
+      });
+
+      await tx.room.delete({
+        where: { id: roomId },
+      });
+    });
   }
 
   private createInviteCode() {

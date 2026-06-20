@@ -1,7 +1,9 @@
 "use client";
 
 import type { DeveloperSession, Direction, Room } from "@/lib/types";
+import { directionArrow } from "@/lib/facing";
 import { CharacterAvatar } from "./character-avatar";
+import { getCharacterPositionStyle } from "./character-position";
 import type { OfficeLayout } from "./office-map";
 import { createTileKey, getFurnitureClassName, getTileClassName } from "./office-map";
 import styles from "./town-board.module.css";
@@ -31,6 +33,14 @@ export function TownBoard({
   connectionState,
   blockedNotice,
 }: TownBoardProps) {
+  const positionCounts = new Map<string, number>();
+  sessions.forEach((candidate) => {
+    const key = createTileKey(candidate.positionX, candidate.positionY);
+    positionCounts.set(key, (positionCounts.get(key) ?? 0) + 1);
+  });
+
+  const positionUsage = new Map<string, number>();
+
   return (
     <section className={styles.panel}>
       <div className={styles.frame}>
@@ -47,6 +57,7 @@ export function TownBoard({
             <span className={styles.legend}>벽 프레임</span>
             <span className={styles.legend}>타일 기반 오피스</span>
             <span className={styles.legend}>사람형 SVG 캐릭터</span>
+            <span className={styles.legend}>좌표 0-base</span>
           </div>
         </div>
 
@@ -98,8 +109,15 @@ export function TownBoard({
               {sessions.map((candidate) => {
                 const isCurrent = candidate.id === session.id;
                 const isSelected = candidate.id === selectedPeerId;
-                const left = `${((candidate.positionX + 0.5) / room.width) * 100}%`;
-                const top = `${((candidate.positionY + 0.5) / room.height) * 100}%`;
+                const tileKey = createTileKey(candidate.positionX, candidate.positionY);
+                const duplicateCount = positionCounts.get(tileKey) ?? 1;
+                const duplicateIndex = positionUsage.get(tileKey) ?? 0;
+                positionUsage.set(tileKey, duplicateIndex + 1);
+                const spread = duplicateCount > 1 ? duplicateIndex - (duplicateCount - 1) / 2 : 0;
+                const positionStyle = getCharacterPositionStyle(candidate, room, {
+                  x: spread * 14,
+                  y: duplicateCount > 1 ? Math.abs(spread) * -4 : 0,
+                });
 
                 return (
                   <button
@@ -110,14 +128,14 @@ export function TownBoard({
                       isCurrent ? styles.characterCurrent : "",
                       isSelected ? styles.characterSelected : "",
                     ].join(" ")}
-                    style={{
-                      left,
-                      top,
-                    }}
+                    style={positionStyle}
                     onClick={() => onSelectPeer(candidate.id === session.id ? null : candidate.id)}
-                    title={`${candidate.displayName} · ${candidate.positionX}, ${candidate.positionY}`}
+                    title={`${candidate.displayName} · ${candidate.positionX}, ${candidate.positionY} · ${candidate.direction} · 0-base`}
                   >
                     <span className={styles.badge} style={{ background: candidate.avatarColor }} />
+                    <span className={styles.characterDirection} aria-hidden="true">
+                      {directionArrow(candidate.direction)}
+                    </span>
                     <CharacterAvatar
                       direction={candidate.direction}
                       color={candidate.avatarColor}
@@ -125,9 +143,7 @@ export function TownBoard({
                       label={`${candidate.displayName} 캐릭터`}
                     />
                     <span className={styles.characterName}>{candidate.displayName}</span>
-                    <span className={styles.characterMeta}>
-                      {candidate.positionX + 1}, {candidate.positionY + 1}
-                    </span>
+                    <span className={styles.characterMeta}>{candidate.positionX}, {candidate.positionY}</span>
                   </button>
                 );
               })}

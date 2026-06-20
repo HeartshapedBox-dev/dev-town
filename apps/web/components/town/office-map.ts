@@ -6,6 +6,7 @@ export type OfficeFurnitureKind =
   | "conference"
   | "plant"
   | "cabinet"
+  | "waterCooler"
   | "whiteboard"
   | "sofa"
   | "coffee";
@@ -129,6 +130,8 @@ export function buildOfficeLayout(width: number, height: number): OfficeLayout {
   const boardY = scaledPosition(0.28, 3, safeHeight);
   const coffeeX = scaledPosition(0.44, 2, safeWidth);
   const coffeeY = scaledPosition(0.76, 2, safeHeight);
+  const coolerX = scaledPosition(0.18, 1, safeWidth);
+  const coolerY = scaledPosition(0.53, 2, safeHeight);
 
   fillRect(tiles, safeWidth, safeHeight, "carpet", meetingX, meetingY, 5, 4);
   fillRect(tiles, safeWidth, safeHeight, "walkway", Math.max(1, Math.floor(safeWidth / 2) - 1), 0, 2, safeHeight);
@@ -149,6 +152,7 @@ export function buildOfficeLayout(width: number, height: number): OfficeLayout {
   addFurniture(furniture, "whiteboard", "회의실 보드", boardX, boardY, 2, 3, true, "back");
   addFurniture(furniture, "sofa", "라운지 소파", loungeX, loungeY, 4, 1, true, "front");
   addFurniture(furniture, "coffee", "커피 테이블", coffeeX, coffeeY, 2, 1, true, "front");
+  addFurniture(furniture, "waterCooler", "워터쿨러", coolerX, coolerY, 1, 2, true, "front");
 
   return {
     width: safeWidth,
@@ -202,6 +206,8 @@ export function getFurnitureClassName(kind: OfficeFurnitureKind) {
       return "sofa";
     case "coffee":
       return "coffee";
+    case "waterCooler":
+      return "waterCooler";
   }
 }
 

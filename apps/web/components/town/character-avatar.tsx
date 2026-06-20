@@ -13,38 +13,36 @@ export function CharacterAvatar({ direction, color, selected, label }: Character
 
   return (
     <svg
-      viewBox="0 0 80 108"
+      viewBox="0 0 48 64"
       role="img"
       aria-label={label}
       className={selected ? `${styles.avatar} ${styles.selected}` : styles.avatar}
       data-direction={direction}
+      shapeRendering="crispEdges"
+      style={{ imageRendering: "pixelated" }}
     >
       <defs>
         <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={color} stopOpacity="0.95" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.66" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.96" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.7" />
         </linearGradient>
       </defs>
-      <ellipse cx="40" cy="98" rx="18" ry="5.5" fill="rgba(0, 0, 0, 0.28)" />
+      <ellipse cx="24" cy="60" rx="13" ry="3" fill="rgba(0, 0, 0, 0.3)" />
       <g transform={avatarTransform(direction)}>
-        <circle cx="40" cy="25" r="15" fill="#f1d4c4" />
-        <path
-          d="M25 27c0-13 11-23 23-23s23 10 23 23c0 2-1 5-2 6-4-7-10-12-21-12s-17 4-21 12c-1-2-2-4-2-6Z"
-          fill="rgba(35, 24, 18, 0.92)"
-        />
-        <path
-          d="M30 43c3-3 8-6 10-6h0c2 0 7 3 10 6 3 4 6 11 6 18v25H24V61c0-7 3-14 6-18Z"
-          fill={`url(#${gradientId})`}
-        />
-        <path d="M21 53c4 0 9 3 13 8l-4 5c-5-4-8-5-12-5-3 0-5 1-7 3l-3-4c3-4 8-7 13-7Z" fill={color} opacity="0.9" />
-        <path d="M59 53c5 0 10 3 13 7l-3 4c-2-2-4-3-7-3-4 0-7 1-12 5l-4-5c4-5 9-8 13-8Z" fill={color} opacity="0.9" />
-        <rect x="29" y="65" width="9" height="26" rx="4.5" fill="#2f3a4a" />
-        <rect x="42" y="65" width="9" height="26" rx="4.5" fill="#2f3a4a" />
-        <rect x="24" y="89" width="14" height="7" rx="3.5" fill="#202734" />
-        <rect x="42" y="89" width="14" height="7" rx="3.5" fill="#202734" />
-        <circle cx="34" cy="25" r="2.5" fill="#3d2a24" opacity="0.95" />
-        <circle cx="46" cy="25" r="2.5" fill="#3d2a24" opacity="0.95" />
-        <path d="M34 32c2 2 10 2 12 0" fill="none" stroke="#b05a5a" strokeWidth="3" strokeLinecap="round" />
+        {renderHead(direction)}
+        <rect x="17" y="18" width="14" height="14" rx="2" fill={`url(#${gradientId})`} />
+        <rect x="13" y="20" width="4" height="8" rx="1" fill={color} />
+        <rect x="31" y="20" width="4" height="8" rx="1" fill={color} />
+        <rect x="18" y="32" width="12" height="10" rx="1.5" fill="#2f3a4a" />
+        <rect x="16" y="34" width="4" height="11" rx="1" fill="#2f3a4a" />
+        <rect x="28" y="34" width="4" height="11" rx="1" fill="#2f3a4a" />
+        <rect x="15" y="43" width="6" height="4" rx="1" fill="#202734" />
+        <rect x="27" y="43" width="6" height="4" rx="1" fill="#202734" />
+        <rect x="16" y="19" width="4" height="2" fill="#f5e6de" opacity="0.55" />
+        <rect x="28" y="19" width="3" height="2" fill="#f5e6de" opacity="0.35" />
+        <rect x="18" y="33" width="4" height="2" fill="#45556a" opacity="0.8" />
+        <rect x="25" y="33" width="3" height="2" fill="#45556a" opacity="0.8" />
+        <path d="M23 8 L25 11 L21 11 Z" fill="#ffffff" opacity="0.55" />
       </g>
     </svg>
   );
@@ -53,7 +51,7 @@ export function CharacterAvatar({ direction, color, selected, label }: Character
 function avatarTransform(direction: CharacterAvatarProps["direction"]) {
   switch (direction) {
     case "UP":
-      return "translate(0 0) scale(1 0.98)";
+      return "translate(0 0)";
     case "LEFT":
       return "translate(0 0)";
     case "RIGHT":
@@ -61,5 +59,50 @@ function avatarTransform(direction: CharacterAvatarProps["direction"]) {
     case "DOWN":
     default:
       return "translate(0 0)";
+  }
+}
+
+function renderHead(direction: CharacterAvatarProps["direction"]) {
+  switch (direction) {
+    case "UP":
+      return (
+        <>
+          <rect x="17" y="6" width="14" height="7" rx="2" fill="rgba(35, 24, 18, 0.96)" />
+          <rect x="18" y="11" width="12" height="8" rx="2" fill="#f1d4c4" />
+          <rect x="20" y="13" width="8" height="2" rx="1" fill="#7c5847" opacity="0.45" />
+          <rect x="21" y="17" width="6" height="1" rx="1" fill="#b05a5a" opacity="0.55" />
+        </>
+      );
+    case "DOWN":
+      return (
+        <>
+          <rect x="16" y="6" width="16" height="6" rx="2" fill="rgba(35, 24, 18, 0.96)" />
+          <rect x="17" y="10" width="14" height="10" rx="3" fill="#f1d4c4" />
+          <rect x="19" y="13" width="3" height="2" rx="1" fill="#3d2a24" />
+          <rect x="26" y="13" width="3" height="2" rx="1" fill="#3d2a24" />
+          <rect x="21" y="16" width="6" height="1.5" rx="1" fill="#b05a5a" />
+        </>
+      );
+    case "LEFT":
+      return (
+        <>
+          <rect x="16" y="7" width="13" height="6" rx="2" fill="rgba(35, 24, 18, 0.96)" />
+          <rect x="17" y="11" width="11" height="9" rx="3" fill="#f1d4c4" />
+          <rect x="18" y="13" width="3" height="2" rx="1" fill="#3d2a24" />
+          <rect x="14" y="14" width="4" height="2" rx="1" fill="#7c5847" />
+          <rect x="21" y="16" width="5" height="1.5" rx="1" fill="#b05a5a" />
+        </>
+      );
+    case "RIGHT":
+    default:
+      return (
+        <>
+          <rect x="16" y="7" width="13" height="6" rx="2" fill="rgba(35, 24, 18, 0.96)" />
+          <rect x="17" y="11" width="11" height="9" rx="3" fill="#f1d4c4" />
+          <rect x="18" y="13" width="3" height="2" rx="1" fill="#3d2a24" />
+          <rect x="14" y="14" width="4" height="2" rx="1" fill="#7c5847" />
+          <rect x="21" y="16" width="5" height="1.5" rx="1" fill="#b05a5a" />
+        </>
+      );
   }
 }

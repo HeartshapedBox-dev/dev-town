@@ -12,6 +12,7 @@ import { Server, Socket } from "socket.io";
 import { ChatService } from "../chat/chat.service";
 import { FindOrCreateConversationDto } from "../chat/dto/find-or-create-conversation.dto";
 import { PresenceService } from "../presence/presence.service";
+import { PrismaService } from "../prisma/prisma.service";
 import { JoinRoomByInviteDto } from "../rooms/dto/join-room-by-invite.dto";
 import { RoomsService } from "../rooms/rooms.service";
 import { JoinConversationDto } from "./dto/join-conversation.dto";
@@ -47,11 +48,15 @@ export class TownGateway implements OnGatewayDisconnect {
   private readonly sockets = new Map<string, Socket>();
   // 현재 실시간 채팅이 열려 있다고 판단한 대화방을 메모리에서 추적한다.
   private readonly activeConversations = new Map<string, ConversationState>();
+  // 특정 세션/방의 종료 처리를 중복 실행하지 않도록 보호한다.
+  private readonly handledDisconnectSessions = new Set<string>();
+  private readonly closingRoomIds = new Set<string>();
 
   constructor(
     private readonly presenceService: PresenceService,
     private readonly chatService: ChatService,
     private readonly roomsService: RoomsService,
+    private readonly prismaService: PrismaService,
   ) {}
 
   // 소켓이 끊기면 세션-소켓 매핑만 즉시 정리한다.
@@ -59,12 +64,29 @@ export class TownGateway implements OnGatewayDisconnect {
   handleDisconnect(client: Socket) {
     this.sockets.delete(client.id);
 
-    for (const [sessionId, socketIds] of this.sessionSockets.entries()) {
-      socketIds.delete(client.id);
-      if (socketIds.size === 0) {
-        this.sessionSockets.delete(sessionId);
-      }
+    const sessionId = this.getSocketSessionId(client);
+    if (!sessionId) {
+      return;
     }
+
+    const socketIds = this.sessionSockets.get(sessionId);
+    if (!socketIds) {
+      return;
+    }
+
+    socketIds.delete(client.id);
+    if (socketIds.size > 0) {
+      return;
+    }
+
+    this.sessionSockets.delete(sessionId);
+
+    const roomId = this.getSocketRoomId(client);
+    if ((roomId && this.closingRoomIds.has(roomId)) || this.handledDisconnectSessions.has(sessionId)) {
+      return;
+    }
+
+    void this.finalizeSessionDisconnect(sessionId, "disconnect", undefined);
   }
 
   @SubscribeMessage("joinByInviteCode")
@@ -74,9 +96,11 @@ export class TownGateway implements OnGatewayDisconnect {
   ) {
     // 초대코드로 입장하면 세션을 등록하고, 같은 방의 채팅 상태도 즉시 다시 계산한다.
     const result = await this.roomsService.joinByInviteCode(payload);
+    this.attachSocketContext(client, result.session.id, result.room.id);
     this.registerSessionSocket(result.session.id, client);
     await client.join(result.room.id);
     this.server.to(result.room.id).emit("characterJoined", result.session);
+    await this.emitRoomSessions(result.room.id);
     await this.syncConversationState(result.session);
     return result;
   }
@@ -86,6 +110,8 @@ export class TownGateway implements OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: JoinRoomDto,
   ) {
+    this.attachSocketContext(client, payload.sessionId, payload.roomId);
+    this.registerSessionSocket(payload.sessionId, client);
     await client.join(payload.roomId);
     return this.presenceService.listRoomSessions(payload.roomId);
   }
@@ -101,9 +127,11 @@ export class TownGateway implements OnGatewayDisconnect {
       sessionId,
       position as UpdatePositionDto,
     );
+    this.attachSocketContext(client, session.id, session.roomId);
     this.registerSessionSocket(session.id, client);
     await client.join(session.roomId);
     this.server.to(session.roomId).emit("characterMoved", session);
+    await this.emitRoomSessions(session.roomId);
     await this.syncConversationState(session);
     return session;
   }
@@ -115,9 +143,21 @@ export class TownGateway implements OnGatewayDisconnect {
   ) {
     // 명시적으로 대화방을 열 때도 같은 세션 추적과 room join을 재사용한다.
     const conversation = await this.chatService.findOrCreateConversation(payload);
+    this.attachSocketContext(client, payload.requesterSessionId, undefined);
     this.registerSessionSocket(payload.requesterSessionId, client);
     await this.activateConversation(conversation);
     return conversation;
+  }
+
+  @SubscribeMessage("leaveSession")
+  async leaveSession(@ConnectedSocket() client: Socket) {
+    const sessionId = this.getSocketSessionId(client);
+    if (!sessionId) {
+      return { left: false };
+    }
+
+    await this.finalizeSessionDisconnect(sessionId, "manual", client);
+    return { left: true };
   }
 
   @SubscribeMessage("joinConversation")
@@ -249,13 +289,160 @@ export class TownGateway implements OnGatewayDisconnect {
     await Promise.all(participantSockets.map((socket) => socket.leave(room)));
   }
 
+  private async emitRoomSessions(roomId: string) {
+    const sessions = await this.presenceService.listRoomSessions(roomId);
+    this.server.to(roomId).emit("roomSessionsSynced", sessions);
+    return sessions;
+  }
+
+  private async finalizeSessionDisconnect(
+    sessionId: string,
+    reason: "manual" | "disconnect",
+    currentSocket?: Socket,
+  ) {
+    if (this.handledDisconnectSessions.has(sessionId)) {
+      return;
+    }
+
+    this.handledDisconnectSessions.add(sessionId);
+
+    const session = await this.presenceService.getSessionOrThrow(sessionId).catch(() => null);
+    if (!session) {
+      return;
+    }
+
+    const room = await this.prismaService.room.findUnique({
+      where: { id: session.roomId },
+      select: {
+        id: true,
+        ownerSessionId: true,
+      },
+    });
+
+    if (!room) {
+      await this.disconnectSessionSockets(sessionId, currentSocket);
+      return;
+    }
+
+    if (room.ownerSessionId === session.id) {
+      await this.closeRoom(room.id, session.id, currentSocket);
+    } else {
+      await this.presenceService.markOffline(session.id).catch(() => undefined);
+      await this.deactivateConversationsForSession(session.id);
+      this.server.to(room.id).emit("sessionEnded", {
+        roomId: room.id,
+        sessionId: session.id,
+        reason,
+      });
+      await this.emitRoomSessions(room.id);
+      await this.disconnectSessionSockets(session.id, currentSocket);
+    }
+
+    if (currentSocket) {
+      currentSocket.disconnect(true);
+    }
+  }
+
+  private async closeRoom(roomId: string, ownerSessionId: string, currentSocket?: Socket) {
+    if (this.closingRoomIds.has(roomId)) {
+      return;
+    }
+
+    this.closingRoomIds.add(roomId);
+
+    try {
+      const roomSessions = await this.presenceService.listRoomSessions(roomId);
+      for (const session of roomSessions) {
+        this.handledDisconnectSessions.add(session.id);
+      }
+
+      await this.deactivateConversationsForRoom(roomId);
+      this.server.to(roomId).emit("roomClosed", {
+        roomId,
+        ownerSessionId,
+      });
+
+      await this.roomsService.destroyRoom(roomId).catch(() => undefined);
+      await this.disconnectRoomSockets(roomId, currentSocket);
+    } finally {
+      this.closingRoomIds.delete(roomId);
+    }
+  }
+
+  private async deactivateConversationsForSession(sessionId: string) {
+    const conversations = Array.from(this.activeConversations.values()).filter((conversation) =>
+      this.isConversationInvolvingSession(this.getConversationPairKey(conversation.participantAId, conversation.participantBId), sessionId),
+    );
+
+    for (const conversation of conversations) {
+      await this.deactivateConversation(conversation);
+    }
+  }
+
+  private async deactivateConversationsForRoom(roomId: string) {
+    const conversations = Array.from(this.activeConversations.values()).filter(
+      (conversation) => conversation.roomId === roomId,
+    );
+
+    for (const conversation of conversations) {
+      this.activeConversations.delete(
+        this.getConversationPairKey(conversation.participantAId, conversation.participantBId),
+      );
+    }
+  }
+
+  private async disconnectSessionSockets(sessionId: string, currentSocket?: Socket) {
+    const sockets = Array.from(this.sessionSockets.get(sessionId) ?? [])
+      .map((socketId) => this.sockets.get(socketId))
+      .filter((socket): socket is Socket => Boolean(socket));
+
+    await Promise.all(
+      sockets.map(async (socket) => {
+        if (currentSocket && socket.id === currentSocket.id) {
+          return;
+        }
+
+        await socket.disconnect(true);
+      }),
+    );
+  }
+
+  private async disconnectRoomSockets(roomId: string, currentSocket?: Socket) {
+    const roomSockets = Array.from(this.sockets.values()).filter((socket) => socket.rooms.has(roomId));
+    await Promise.all(
+      roomSockets.map(async (socket) => {
+        if (currentSocket && socket.id === currentSocket.id) {
+          return;
+        }
+
+        await socket.disconnect(true);
+      }),
+    );
+  }
+
   private registerSessionSocket(sessionId: string, client: Socket) {
     // 같은 세션이 여러 소켓으로 연결되어도 모두 추적할 수 있게 저장한다.
+    this.handledDisconnectSessions.delete(sessionId);
     this.sockets.set(client.id, client);
 
     const socketIds = this.sessionSockets.get(sessionId) ?? new Set<string>();
     socketIds.add(client.id);
     this.sessionSockets.set(sessionId, socketIds);
+  }
+
+  private attachSocketContext(client: Socket, sessionId: string, roomId?: string) {
+    client.data.sessionId = sessionId;
+    if (roomId) {
+      client.data.roomId = roomId;
+    }
+  }
+
+  private getSocketSessionId(client: Socket) {
+    return typeof client.data?.sessionId === "string" ? client.data.sessionId : null;
+  }
+
+  private getSocketRoomId(client: Socket) {
+    return typeof client.data?.roomId === "string" ? client.data.roomId : null;
   }
 
   private getParticipantSockets(conversation: Pick<ConversationState, "participantAId" | "participantBId">) {

@@ -55,4 +55,22 @@ export class ChatRepository {
       },
     });
   }
+
+  deleteMessagesByRoomId(roomId: string) {
+    return this.prisma.chatMessage.deleteMany({
+      where: {
+        conversation: {
+          roomId,
+        },
+      },
+    });
+  }
+
+  deleteConversationsByRoomId(roomId: string) {
+    return this.prisma.conversation.deleteMany({
+      where: {
+        roomId,
+      },
+    });
+  }
 }

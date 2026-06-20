@@ -6,6 +6,7 @@ export type Room = {
   inviteCode: string;
   width: number;
   height: number;
+  ownerSessionId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };

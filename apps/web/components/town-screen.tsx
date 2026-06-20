@@ -33,9 +33,35 @@ export function TownScreen({ initialRoomId, initialSessionId }: TownClientProps)
     handleMove,
     handleOpenConversation,
     handleSendMessage,
+    handleDisconnectSession,
     clearConversation,
     refreshSessions,
+    terminalState,
+    terminalMessage,
   } = useTownScreen({ initialRoomId, initialSessionId });
+
+  if (terminalState && terminalMessage) {
+    return (
+      <main className="shell">
+        <section className="panel">
+          <div className="panel-inner">
+            <span className="eyebrow">Town closed</span>
+            <h1 className="title" style={{ fontSize: "clamp(2rem, 6vw, 3.4rem)" }}>
+              {terminalMessage}
+            </h1>
+            <p className="panel-subtitle">
+              연결이 종료되었습니다. 시작 화면으로 돌아가 다시 접속할 수 있습니다.
+            </p>
+            <div className="button-row">
+              <button className="button" type="button" onClick={() => router.push("/")}>
+                시작 화면으로
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   if (!room || !session) {
     return (
@@ -85,6 +111,9 @@ export function TownScreen({ initialRoomId, initialSessionId }: TownClientProps)
                 <button className="button button-secondary" type="button" onClick={() => void refreshSessions()}>
                   세션 새로고침
                 </button>
+                <button className="button button-secondary" type="button" onClick={() => void handleDisconnectSession()}>
+                  세션 끊기
+                </button>
               </div>
             </div>
           </div>
@@ -126,7 +155,7 @@ export function TownScreen({ initialRoomId, initialSessionId }: TownClientProps)
                   </div>
 
                   <div className="mini">
-                    좌표: ({session.positionX}, {session.positionY}) · 상태: {session.status}
+                    좌표(0-base): ({session.positionX}, {session.positionY}) · 상태: {session.status}
                   </div>
                 </div>
               </div>
@@ -156,7 +185,7 @@ export function TownScreen({ initialRoomId, initialSessionId }: TownClientProps)
                         <span className="chip">{candidate.direction}</span>
                       </div>
                       <div className="mini">
-                        ({candidate.positionX}, {candidate.positionY}) · {candidate.status}
+                        좌표(0-base): ({candidate.positionX}, {candidate.positionY}) · {candidate.status}
                       </div>
                     </button>
                   ))}
@@ -181,6 +210,9 @@ export function TownScreen({ initialRoomId, initialSessionId }: TownClientProps)
                   </button>
                   <button className="button button-secondary" type="button" onClick={clearConversation}>
                     채팅 닫기
+                  </button>
+                  <button className="button button-secondary" type="button" onClick={() => void handleDisconnectSession()}>
+                    세션 끊기
                   </button>
                 </div>
               </div>

@@ -15,10 +15,43 @@ export class PresenceRepository {
     return this.prisma.developerSession.findUnique({ where: { id } });
   }
 
+  findByIdWithRoom(id: string) {
+    return this.prisma.developerSession.findUnique({
+      where: { id },
+      include: { room: true },
+    });
+  }
+
+  findRoomById(id: string) {
+    return this.prisma.room.findUnique({ where: { id } });
+  }
+
+  async claimRoomOwner(roomId: string, sessionId: string) {
+    await this.prisma.room.updateMany({
+      where: {
+        id: roomId,
+        ownerSessionId: null,
+      },
+      data: {
+        ownerSessionId: sessionId,
+      },
+    });
+  }
+
   listOnlineByRoom(roomId: string) {
     return this.prisma.developerSession.findMany({
       where: { roomId, status: "ONLINE" },
       orderBy: { lastSeenAt: "desc" },
+    });
+  }
+
+  markOffline(id: string) {
+    return this.prisma.developerSession.update({
+      where: { id },
+      data: {
+        status: "OFFLINE",
+        lastSeenAt: new Date(),
+      },
     });
   }
 
@@ -48,4 +81,5 @@ export class PresenceRepository {
       throw error;
     }
   }
+
 }

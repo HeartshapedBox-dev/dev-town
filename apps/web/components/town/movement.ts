@@ -2,7 +2,12 @@
 
 import type { DeveloperSession, Direction, Room } from "../../lib/types";
 import type { OfficeLayout } from "./office-map";
-import { getBlockedMoveMessage, getBlockingItem } from "./collision";
+import {
+  getBlockedMoveMessage,
+  getBlockedSessionMoveMessage,
+  getBlockingItem,
+  getBlockingSession,
+} from "./collision";
 
 export type UpdatePositionInput = {
   roomId: string;
@@ -55,8 +60,17 @@ export function createMovePlan(
   room: Room,
   direction: Direction,
   layout: OfficeLayout | null,
+  sessions: DeveloperSession[] = [],
 ): MovePlan {
   const command = createMoveCommand(session, direction, room);
+  const blockingSession = getBlockingSession(sessions, session.id, command.positionX, command.positionY);
+  if (blockingSession) {
+    return {
+      blocked: true,
+      message: getBlockedSessionMoveMessage(),
+    };
+  }
+
   const blockingItem = layout ? getBlockingItem(layout, command.positionX, command.positionY) : null;
 
   if (blockingItem) {
