@@ -74,6 +74,19 @@ describe("ChatService", () => {
     expect(chatRepository.createConversation).not.toHaveBeenCalled();
   });
 
+  // ChatService는 메시지 목록을 저장소 결과 그대로 반환하는지 검증한다.
+  it("returns messages from the repository without transforming them", async () => {
+    const messages = [
+      { id: "message-1", conversationId: conversation.id, senderId: requester.id, body: "안녕하세요" },
+      { id: "message-2", conversationId: conversation.id, senderId: peer.id, body: "반갑습니다" },
+    ];
+    chatRepository.listMessages.mockResolvedValue(messages);
+
+    await expect(chatService.listMessages(conversation.id)).resolves.toBe(messages);
+
+    expect(chatRepository.listMessages).toHaveBeenCalledWith(conversation.id);
+  });
+
   // ChatService는 마주보지 않는 세션의 대화방 생성과 메시지 전송을 차단하는지 검증한다.
   it("blocks conversation opening when participants are not facing each other", async () => {
     presenceService.canStartConversation.mockReturnValue(false);

@@ -256,6 +256,33 @@ describe("TownGateway", () => {
     expect(socketB.leave).toHaveBeenCalledWith("conversation:conversation-1");
   });
 
+  // WebSocket 채팅 전송은 저장된 메시지를 conversation room으로 그대로 브로드캐스트해야 한다.
+  it("broadcasts created messages to the conversation room", async () => {
+    const message = {
+      id: "message-1",
+      conversationId: conversation.id,
+      senderId: "session-a",
+      body: "안녕하세요",
+    };
+    chatService.sendMessage.mockResolvedValue(message);
+
+    await expect(
+      gateway.sendMessage({
+        conversationId: conversation.id,
+        senderSessionId: "session-a",
+        body: "안녕하세요",
+      } as never),
+    ).resolves.toBe(message);
+
+    expect(chatService.sendMessage).toHaveBeenCalledWith(conversation.id, {
+      conversationId: conversation.id,
+      senderSessionId: "session-a",
+      body: "안녕하세요",
+    });
+    expect(server.to).toHaveBeenCalledWith("conversation:conversation-1");
+    expect(server.emit).toHaveBeenCalledWith("messageCreated", message);
+  });
+
   it("marks a non-owner session offline and emits sessionEnded on manual leave", async () => {
     prismaService.room.findUnique.mockResolvedValue({
       id: room.id,
